@@ -263,7 +263,8 @@ const STATE = {
     GAMEOVER: 2,
     PAUSED: 3,
     BITTEN: 4, // ヒラメに食べられている状態
-    REPLAY: 5  // リプレイ再生中
+    REPLAY: 5, // リプレイ再生中
+    CAUGHT: 6  // 網に捕まっている
 };
 
 /**
@@ -344,9 +345,16 @@ class SoundManager {
         }
         const noise = this.ctx.createBufferSource();
         noise.buffer = buffer;
+        
+        // ローパスフィルタをかけて水流のような低い音にする
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400; // こもらせる
+
         const gain = this.ctx.createGain();
         gain.gain.value = vol;
-        noise.connect(gain);
+        noise.connect(filter);
+        filter.connect(gain);
         gain.connect(this.ctx.destination);
         noise.start();
     }
@@ -418,6 +426,9 @@ class Game {
         this.replayIndex = 0;
         this.replayDummies = {}; // リプレイ描画用のダミーインスタンス
         this.lastBossDistance = 0;
+        this.caughtNet = null; // 捕まっている網
+        this.escapeClicks = 0; // 脱出連打数
+        this.requiredClicks = 5; // 脱出に必要な連打数
         this.sound = new SoundManager();
 
         this.player = new Shrimp(this.width / 3, this.height / 2);
@@ -566,6 +577,15 @@ class Game {
                 this.togglePause();
                 return;
             }
+            
+            // 網からの脱出連打
+            if (this.state === STATE.CAUGHT) {
+                this.escapeClicks++;
+                this.sound.playTone(400 + this.escapeClicks * 50, 'square', 0.05, 0.1);
+                if (this.escapeClicks >= this.requiredClicks) {
+                    this.escapeFromNet();
+                }
+            }
 
             if (e.type === 'keydown' && !(e.code === 'Space')) return;
             if (e.type === 'touchstart') e.preventDefault(); // スクロール防止
@@ -635,6 +655,9 @@ class Game {
         this.streamLines = [];
         this.backgroundObjects = [];
         this.screenshotTaken = false;
+        this.caughtNet = null;
+        this.escapeClicks = 0;
+        
         this.replayBuffer = [];
         this.sound.startBGM();
         this.enemies = [];
@@ -642,7 +665,9 @@ class Game {
         this.decorations = [];
         this.particles = [];
         this.floatingTexts = [];
-        this.player.reset(this.width / 3, this.height / 2);
+        // スマホ向け調整: 画面が狭い場合はプレイヤーを左側に寄せて反応時間を稼ぐ
+        const startX = this.width < 600 ? this.width * 0.15 : this.width / 3;
+        this.player.reset(startX, this.height / 2);
         this.updatePlayerSize();
     }
 
@@ -696,6 +721,28 @@ class Game {
         }
     }
 
+    catchPlayer(net) {
+        if (this.player.isInvincible) return;
+        this.state = STATE.CAUGHT;
+        this.caughtNet = net;
+        this.escapeClicks = 0;
+        this.requiredClicks = 5; // 連打回数設定
+        this.addFloatingText(this.player.x, this.player.y - 40, "連打で逃げろ！", "#FF4500");
+    }
+
+    escapeFromNet() {
+        this.state = STATE.PLAYING;
+        this.player.setInvincible(60); // 無敵時間付与
+        this.player.jump(); // ジャンプして復帰
+        if (this.caughtNet) {
+            this.caughtNet.markedForDeletion = true; // 網を消す
+            // 破片エフェクトなどを出しても良い
+        }
+        this.caughtNet = null;
+        this.addFloatingText(this.player.x, this.player.y, "脱出！", "#FFFFFF");
+        this.sound.playJump();
+    }
+
     triggerFlatfishDeath(flatfish) {
         // ヒラメに食べられる演出開始
         this.sound.playHit();
@@ -730,6 +777,7 @@ class Game {
     }
 
     gameOver(reason) {
+        if (reason) this.deathReason = reason;
         this.state = STATE.GAMEOVER;
         this.screenGameOver.style.display = 'block';
         
@@ -864,7 +912,7 @@ class Game {
                 this.enemies.push(new Shark(this.width, Math.random() * (this.height - 100) + 50, this.player));
             } else if (type < 0.60) {
                 // 網 (10%)
-                this.enemies.push(new Net(this.width, Math.random() * (this.height - 200) + 100));
+                this.enemies.push(new Net(this.width + 100, Math.random() * (this.height - 200) + 100));
             } else if (type < 0.70) {
                 // 釣り針 (10%)
                 this.enemies.push(new Hook(this.width, -100));
@@ -1018,7 +1066,7 @@ class Game {
             return;
         }
 
-        if (this.state !== STATE.PLAYING) {
+        if (this.state !== STATE.PLAYING && this.state !== STATE.CAUGHT) {
             if (this.state === STATE.GAMEOVER) this.frameCount++;
             return;
         }
@@ -1072,7 +1120,7 @@ class Game {
                 this.rapidCurrentTimer = 0;
                 // 激流の高さを決定 (画面の20%〜80%の範囲)
                 this.rapidCurrentY = this.height * 0.2 + Math.random() * (this.height * 0.6);
-                this.addFloatingText(this.width / 2, this.height / 2, "激流注意！", "#FF4500");
+                this.addFloatingText(this.width / 2, this.rapidCurrentY, "激流注意！", "#FF4500");
             }
         } else if (this.isRapidCurrent) {
             if (this.rapidCurrentTimer > 300) {
@@ -1095,14 +1143,36 @@ class Game {
             }
         }
 
-        // プレイヤー更新
-        this.player.update(this);
+        if (this.state === STATE.CAUGHT) {
+            // 捕獲中の処理
+            if (this.caughtNet) {
+                // プレイヤーを網の位置に拘束
+                this.player.x = this.caughtNet.x;
+                this.player.y = this.caughtNet.y;
+                
+                // 暴れる演出（回転とバタつき）
+                this.player.angle = (Math.random() - 0.5) * 0.8;
+                this.player.isBending = (this.frameCount % 8 < 4);
 
-        // 画面左端ゲームオーバー判定
-        if (this.player.x < -this.player.radius) {
-            this.lives = 0;
-            this.gameOver("波に飲まれた"); // 無敵時間を無視して即ゲームオーバー
-            return;
+                // 網が消滅していたら復帰（安全策）
+                if (this.caughtNet.markedForDeletion) {
+                    this.escapeFromNet();
+                }
+            }
+            // 左端判定（網ごと流されて死ぬ）
+            if (this.player.x < -this.player.radius) {
+                this.lives = 0;
+                this.gameOver("網に捕まったまま流された");
+                return;
+            }
+        } else {
+            // 通常プレイ中の処理
+            this.player.update(this);
+            if (this.player.x < -this.player.radius) {
+                this.lives = 0;
+                this.gameOver("波に飲まれた");
+                return;
+            }
         }
 
         // 敵生成と更新
@@ -1113,6 +1183,12 @@ class Game {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
             enemy.update(this.scrollSpeed, this); // Hookのためにthis(game)を渡す
+
+            // 削除フラグが立っている敵を削除
+            if (enemy.markedForDeletion) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
 
             // 安全策: 座標がNaNになった敵は削除（フリーズ防止）
             if (!isFinite(enemy.x) || !isFinite(enemy.y)) {
@@ -1127,7 +1203,7 @@ class Game {
             }
 
             // 当たり判定
-            if (enemy.checkCollision(this.player)) {
+            if (this.state === STATE.PLAYING && enemy.checkCollision(this.player)) {
                 if (enemy instanceof Flatfish) {
                     // ヒラメは即死演出
                     this.triggerFlatfishDeath(enemy);
@@ -1139,7 +1215,10 @@ class Game {
                     else if (enemy instanceof Hook) reason = "釣り針に引っかかった";
                     else if (enemy instanceof Anglerfish) reason = "提灯鮟鱇に食べられた";
                     else if (enemy instanceof Shark) reason = "サメに噛まれた";
-                    else if (enemy instanceof Net) reason = "網に捕まった";
+                    else if (enemy instanceof Net) {
+                        this.catchPlayer(enemy);
+                        continue; // 捕獲処理へ
+                    }
                     else if (enemy instanceof Squid) reason = "イカにぶつかった";
                     else if (enemy instanceof Octopus) reason = "タコに捕まった";
                     else if (enemy instanceof Jellyfish) reason = "クラゲに刺された";
@@ -1366,6 +1445,45 @@ class Game {
 
         // プレイヤー描画
         this.player.draw(this.ctx, this.lives, this.decorations);
+
+        // 捕獲中のUI描画
+        if (this.state === STATE.CAUGHT || (this.state === STATE.GAMEOVER && this.caughtNet)) {
+            // プレイヤーの上に網を描画して「捕まっている感」を出す
+            this.ctx.save();
+            this.ctx.translate(this.player.x, this.player.y);
+            
+            // 円形でクリッピング
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, this.player.radius + 8, 0, Math.PI * 2);
+            this.ctx.clip();
+
+            this.ctx.strokeStyle = 'rgba(80, 50, 20, 0.9)';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            const r = this.player.radius + 10;
+            for(let i = -r; i <= r; i += 8) {
+                this.ctx.moveTo(i, -r); this.ctx.lineTo(i, r);
+                this.ctx.moveTo(-r, i); this.ctx.lineTo(r, i);
+            }
+            this.ctx.stroke();
+            this.ctx.restore();
+
+        }
+        if (this.state === STATE.CAUGHT) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText("連打!!", this.player.x, this.player.y - 50);
+            // ゲージ
+            const barW = 60;
+            const progress = Math.min(1.0, this.escapeClicks / this.requiredClicks);
+            this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            this.ctx.fillRect(this.player.x - barW/2, this.player.y - 40, barW, 8);
+            this.ctx.fillStyle = '#FF4500';
+            this.ctx.fillRect(this.player.x - barW/2, this.player.y - 40, barW * progress, 8);
+            this.ctx.restore();
+        }
     }
 
     drawReplay() {
@@ -1898,52 +2016,78 @@ class Tuna extends Enemy {
         this.x -= (baseSpeed + this.speed);
     }
     draw(ctx) {
-        // メタリックなボディ
-        const grad = ctx.createLinearGradient(this.x - 40, this.y - 20, this.x + 40, this.y + 20);
-        grad.addColorStop(0, '#000080'); // Navy
-        grad.addColorStop(0.4, '#4169E1'); // RoyalBlue
-        grad.addColorStop(1, '#C0C0C0'); // Silver (腹)
+        // マグロ（クロマグロ）
+        // 紡錘形の流線型ボディ
+        const grad = ctx.createLinearGradient(this.x, this.y - 25, this.x, this.y + 25);
+        grad.addColorStop(0, '#000033'); // 濃紺（背中）
+        grad.addColorStop(0.4, '#191970'); // 紺
+        grad.addColorStop(0.6, '#708090'); // 銀灰
+        grad.addColorStop(1, '#F0F8FF'); // 白（腹）
         ctx.fillStyle = grad;
 
-        // 紡錘形の体
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 45, 18, 0, 0, Math.PI * 2);
+        // 頭から尾にかけてのカーブ
+        ctx.moveTo(this.x - 45, this.y); // 鼻先
+        ctx.quadraticCurveTo(this.x - 20, this.y - 28, this.x + 20, this.y - 20); // 背中
+        ctx.lineTo(this.x + 45, this.y - 5); // 尾柄（上）
+        ctx.lineTo(this.x + 45, this.y + 5); // 尾柄（下）
+        ctx.quadraticCurveTo(this.x + 20, this.y + 20, this.x - 20, this.y + 28); // 腹
+        ctx.quadraticCurveTo(this.x - 35, this.y + 15, this.x - 45, this.y); // 顎
         ctx.fill();
 
-        // 横縞ライン
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(this.x - 30, this.y);
-        ctx.lineTo(this.x + 30, this.y);
-        ctx.stroke();
-
-        // 黄色い小離鰭（背中と腹の後ろの方にあるギザギザ）
+        // 黄色い小離鰭（マグロの特徴）
         ctx.fillStyle = '#FFD700';
-        for(let i=0; i<5; i++) {
+        for(let i=0; i<6; i++) {
             // 背側
             ctx.beginPath();
-            ctx.moveTo(this.x + 10 + i*5, this.y - 16);
-            ctx.lineTo(this.x + 13 + i*5, this.y - 22);
-            ctx.lineTo(this.x + 16 + i*5, this.y - 15);
+            ctx.moveTo(this.x + 15 + i*5, this.y - 22);
+            ctx.lineTo(this.x + 18 + i*5, this.y - 28);
+            ctx.lineTo(this.x + 21 + i*5, this.y - 21);
             ctx.fill();
             // 腹側
             ctx.beginPath();
-            ctx.moveTo(this.x + 10 + i*5, this.y + 16);
-            ctx.lineTo(this.x + 13 + i*5, this.y + 22);
-            ctx.lineTo(this.x + 16 + i*5, this.y + 15);
+            ctx.moveTo(this.x + 15 + i*5, this.y + 22);
+            ctx.lineTo(this.x + 18 + i*5, this.y + 28);
+            ctx.lineTo(this.x + 21 + i*5, this.y + 21);
             ctx.fill();
         }
+
+        // 第2背びれ・尻びれ（鎌状）
+        ctx.fillStyle = '#191970'; // 濃紺
+        ctx.beginPath();
+        ctx.moveTo(this.x + 10, this.y - 25);
+        ctx.quadraticCurveTo(this.x + 15, this.y - 45, this.x + 25, this.y - 22);
+        ctx.fill();
+        ctx.fillStyle = '#F0F8FF'; // 白っぽい
+        ctx.beginPath();
+        ctx.moveTo(this.x + 10, this.y + 25);
+        ctx.quadraticCurveTo(this.x + 15, this.y + 45, this.x + 25, this.y + 22);
+        ctx.fill();
+
+        // 尾びれ（三日月型）
+        ctx.fillStyle = '#2F4F4F';
+        ctx.beginPath();
+        ctx.moveTo(this.x + 45, this.y);
+        ctx.lineTo(this.x + 60, this.y - 25);
+        ctx.quadraticCurveTo(this.x + 50, this.y, this.x + 60, this.y + 25);
+        ctx.fill();
 
         // 目
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(this.x - 25, this.y - 3, 5, 0, Math.PI * 2);
+        ctx.arc(this.x - 30, this.y - 5, 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 25, this.y - 3, 2, 0, Math.PI * 2);
+        ctx.arc(this.x - 30, this.y - 5, 2, 0, Math.PI * 2);
         ctx.fill();
+        
+        // エラ蓋
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(this.x - 15, this.y, 15, Math.PI * 0.5, Math.PI * 1.5);
+        ctx.stroke();
     }
 }
 
@@ -2137,20 +2281,49 @@ class Net extends Enemy {
         ctx.stroke();
         ctx.restore();
     }
+
+    checkCollision(player) {
+        // 網の中心部分（袋）に判定を絞る
+        // 見た目は y-70 から y+80 くらいだが、判定は y+10 を中心に半径 50 程度にする
+        const dx = this.x - player.x;
+        const dy = (this.y + 10) - player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < (50 + player.radius); // 半径を80 -> 50に縮小
+    }
 }
 
 class Squid extends Enemy {
     constructor(x, y) {
         super(x, y);
         this.radius = 18;
-        this.baseY = y;
         this.timer = 0;
+        this.lungeTimer = Math.floor(Math.random() * 100);
+        this.vx = 0;
+        this.vy = 0;
     }
     update(speed) {
         this.x -= speed;
         this.timer += 0.05;
-        // 波打つ動き（サイン波）
-        this.y = this.baseY + Math.sin(this.timer) * 80;
+        this.lungeTimer++;
+
+        // 摩擦
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+
+        // 定期的にダッシュ（ゲッソー風）
+        if (this.lungeTimer > 100) {
+            this.lungeTimer = 0;
+            this.vx = 4.0; // 左へ加速
+            this.vy = (Math.random() - 0.5) * 8; // 上下ランダム
+        }
+
+        this.x -= this.vx;
+        this.y += this.vy;
+
+        // ダッシュしていない時はふわふわ
+        if (Math.abs(this.vy) < 0.5) {
+            this.y += Math.sin(this.timer) * 0.5;
+        }
     }
     draw(ctx) {
         const grad = ctx.createRadialGradient(this.x, this.y - 10, 0, this.x, this.y, 20);
@@ -2248,6 +2421,10 @@ class ElectricEel extends Enemy {
         this.speed = 4.5;
         this.angle = 0;
         this.electricTimer = 0;
+        
+        // SVGパスデータを使用した複雑な形状（S字にうねるウナギ）
+        // 頭部(-50,0)から尾部(50,0)にかけての形状
+        this.eelPath = new Path2D("M-50,0 C-45,-15 -25,-20 0,-5 C25,10 45,10 60,-5 L62,0 C47,15 27,15 0,0 C-25,-15 -45,-10 -50,5 Z");
     }
     update(baseSpeed) {
         this.x -= (baseSpeed + this.speed);
@@ -2256,28 +2433,92 @@ class ElectricEel extends Enemy {
             const dy = this.player.y - this.y;
             this.y += dy * 0.02;
         }
-        // うねうね動く
-        this.y += Math.sin(this.angle += 0.2) * 3;
+        // うねうね動く (角度更新)
+        this.angle += 0.15;
         this.electricTimer++;
     }
     draw(ctx) {
-        // 体
-        ctx.fillStyle = '#4B0082'; // Indigo
-        ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 40, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        const isDischarging = Math.floor(this.electricTimer / 4) % 2 === 0;
+
+        // 発光エフェクト
+        if (isDischarging) {
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = '#40E0D0'; // Turquoise
+        }
+
+        // 体色（暗いオリーブ〜茶色）
+        const grad = ctx.createLinearGradient(-40, 0, 40, 0);
+        grad.addColorStop(0, '#2F4F4F'); // DarkSlateGray
+        grad.addColorStop(0.5, '#556B2F'); // DarkOliveGreen
+        grad.addColorStop(1, '#8B4513'); // SaddleBrown
+        ctx.fillStyle = grad;
+
+        // 体の描画（SVGパスを変形させて描画するのは重いので、パス自体を回転・伸縮させる）
+        // ここでは簡易的にY軸スケールを変えて泳いでいるように見せる
+        ctx.save();
+        const swimScale = 1.0 + Math.sin(this.angle) * 0.2;
+        ctx.scale(1.2, 1.2 + Math.sin(this.angle)*0.3); // 伸縮アニメーション
+        ctx.fill(this.eelPath);
         
-        // 放電エフェクト
-        if (Math.floor(this.electricTimer / 5) % 2 === 0) {
-            ctx.strokeStyle = '#FFFF00'; // Yellow
+        // 模様（側線）
+        ctx.strokeStyle = isDischarging ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 2;
+        ctx.stroke(this.eelPath);
+        ctx.restore();
+
+        // ヒレ（背びれ・尻びれ）の放電
+        if (isDischarging) {
+            ctx.strokeStyle = '#E0FFFF';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(this.x - 40, this.y);
-            for(let i=0; i<10; i++) {
-                ctx.lineTo(this.x - 40 + i*8, this.y + (Math.random()-0.5)*20);
+            // 体に沿った稲妻
+            ctx.moveTo(-40, 5);
+            ctx.lineTo(-20, 15);
+            ctx.lineTo(0, 5);
+            ctx.lineTo(20, 15);
+            ctx.lineTo(40, 5);
+            ctx.stroke();
+        }
+
+        // 頭部詳細
+        ctx.save();
+        // 頭の位置に合わせて少し回転
+        ctx.rotate(Math.sin(this.angle) * 0.1);
+        // 目
+        ctx.fillStyle = isDischarging ? '#FFFF00' : '#000';
+        ctx.beginPath();
+        ctx.arc(-42, -5, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 放電スパーク（周囲に散らす）
+        if (isDischarging) {
+            ctx.strokeStyle = '#FFFACD'; // LemonChiffon
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            const sparkCount = 5;
+            for(let k=0; k<sparkCount; k++) {
+                // 体のランダムな位置から
+                const r = Math.random();
+                const bx = -50 + r * 100;
+                const by = (Math.random() - 0.5) * 20;
+                
+                ctx.moveTo(bx, by);
+                let sx = bx;
+                let sy = by;
+                for(let j=0; j<4; j++) {
+                    sx += (Math.random()-0.5) * 30;
+                    sy += (Math.random()-0.5) * 30;
+                    ctx.lineTo(sx, sy);
+                }
             }
             ctx.stroke();
         }
+
+        ctx.restore();
     }
 }
 
@@ -2348,7 +2589,7 @@ class Octopus extends Enemy {
         super(x, y);
         this.radius = 25;
         this.angle = Math.random() * Math.PI * 2;
-        this.moveTimer = 0;
+        this.moveTimer = Math.random() * 100; // 初期値をランダムにして個体差を出す
     }
     update(speed) {
         this.x -= speed;
@@ -2718,59 +2959,84 @@ class Whale extends Enemy {
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        const scale = 1.5; // 巨大化
+        const scale = 1.6; // さらに巨大化
         ctx.scale(scale, scale);
 
-        // 色を変更（海の色と同化しないように明るめのグレー系に）
+        // マッコウクジラ風
+        // 色: 背景（深海）と同化しないよう、少し明るめのグレーに変更
         const grad = ctx.createLinearGradient(-150, -50, 100, 50);
-        grad.addColorStop(0, '#778899'); // LightSlateGray
-        grad.addColorStop(1, '#2F4F4F'); // DarkSlateGray
+        grad.addColorStop(0, '#90A4AE'); // BlueGray Light
+        grad.addColorStop(1, '#546E7A'); // BlueGray Medium
         ctx.fillStyle = grad;
         
         // 体
         ctx.beginPath();
-        // 頭部（四角く大きく）
-        ctx.moveTo(80, -40);
-        ctx.lineTo(-100, -50);
+        // 頭部（巨大な四角い頭）
+        ctx.moveTo(100, -30); // 鼻先上
+        ctx.lineTo(-80, -40); // 背中へ
         // 背中から尾へ
-        ctx.quadraticCurveTo(200, -40, 300, 0);
-        // 尾から腹へ
-        ctx.quadraticCurveTo(200, 40, -80, 50);
-        // 下顎
-        ctx.lineTo(60, 40);
-        ctx.quadraticCurveTo(80, 20, 80, -40);
+        ctx.quadraticCurveTo(150, -40, 250, -5); // 尾柄へ
+        // 尾びれ付け根
+        ctx.lineTo(250, 5);
+        // 腹側
+        ctx.quadraticCurveTo(100, 40, -60, 40); // 腹
+        // 下顎（細長い）
+        ctx.lineTo(80, 35); // 下顎先端
+        ctx.lineTo(90, 25); // 口角
+        ctx.lineTo(100, -30); // 鼻先に戻る
         ctx.fill();
 
-        // 腹の白い部分
-        ctx.fillStyle = '#E0E0E0';
+        // 輪郭のハイライト（背中側）を追加して視認性を向上
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(-80, 50);
-        ctx.quadraticCurveTo(100, 40, 200, 10);
-        ctx.quadraticCurveTo(100, 20, -60, 30);
-        ctx.fill();
+        ctx.moveTo(100, -30); // 鼻先上
+        ctx.lineTo(-80, -40); // 背中へ
+        ctx.quadraticCurveTo(150, -40, 250, -5); // 尾柄へ
+        ctx.stroke();
 
-        // 胸ビレ
-        ctx.fillStyle = '#778899';
+        // 皮膚の質感（シワ）
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let i=0; i<5; i++) {
+            ctx.moveTo(-50 + i*30, -35);
+            ctx.quadraticCurveTo(-40 + i*30, 0, -50 + i*30, 35);
+        }
+        ctx.stroke();
+
+        // 胸ビレ（短く丸い）
+        ctx.fillStyle = '#3E4E5A';
         ctx.beginPath();
         ctx.moveTo(-20, 20);
-        ctx.quadraticCurveTo(-40, 50, -10, 40);
+        ctx.quadraticCurveTo(-40, 45, -10, 35);
+        ctx.quadraticCurveTo(-15, 25, -20, 20);
         ctx.fill();
 
-        // 尾びれ
+        // 尾びれ（大きく）
+        ctx.fillStyle = '#2F3F4F';
         ctx.beginPath();
-        ctx.moveTo(300, 0);
-        ctx.lineTo(350, -30);
-        ctx.lineTo(350, 30);
+        ctx.moveTo(250, 0);
+        ctx.lineTo(300, -35);
+        ctx.quadraticCurveTo(290, 0, 300, 35);
+        ctx.lineTo(250, 0);
         ctx.fill();
 
-        // 目
+        // 目（小さく、低い位置）
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(-40, 10, 4, 0, Math.PI * 2);
+        ctx.arc(-30, 15, 2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'black';
+        // 目の周りのシワ
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.beginPath();
-        ctx.arc(-41, 10, 2, 0, Math.PI * 2);
+        ctx.arc(-30, 15, 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 潮吹きの穴
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(-60, -38, 5, 2, 0, 0, Math.PI*2);
         ctx.fill();
 
         ctx.restore();

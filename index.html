@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>えびちゃん（仮）</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦐</text></svg>">
     <style>
         body {
             margin: 0;
@@ -74,13 +75,22 @@
             line-height: 1.5;
         }
         .blink {
-            animation: blinker 1.5s linear infinite;
-            color: #FF4500;
+            animation: blinker 0.8s ease-in-out infinite alternate;
+            background-color: #FF6F61;
+            color: white;
             font-weight: bold;
-            margin-top: 15px;
+            padding: 15px 40px;
+            border-radius: 30px;
+            margin-top: 20px;
+            display: inline-block;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 111, 97, 0.4);
+            user-select: none;
+            -webkit-user-select: none;
         }
         @keyframes blinker {
-            50% { opacity: 0; }
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.1); opacity: 0.9; }
         }
         /* スマホ向け調整 */
         @media (max-width: 600px) {
@@ -151,6 +161,22 @@
             display: block;
             animation: blinker 0.2s linear infinite;
         }
+        .difficulty-select {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .diff-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -173,21 +199,34 @@
 
     <div id="start-screen" class="message-box">
         <h1>えびちゃん（仮）</h1>
-        <p>画面タップ / スペースキー<br>で泳ぐ！</p>
-        <p>敵を避けて距離を競おう</p>
-        <div class="blink">TAP TO START</div>
+        <p>泳ぐ：タップ / スペース</p>
+        <p>難易度を選んでスタート</p>
+        <div class="difficulty-select">
+            <button id="btn-easy" class="diff-btn" style="background-color: #4CAF50;">EASY</button>
+            <button id="btn-normal" class="diff-btn" style="background-color: #2196F3;">NORMAL</button>
+            <button id="btn-hard" class="diff-btn" style="background-color: #f44336;">HARD</button>
+        </div>
     </div>
 
     <div id="gameover-screen" class="message-box" style="display: none;">
         <h1>GAME OVER</h1>
+        <img id="screenshot" style="width: 100%; max-width: 400px; height: auto; border-radius: 10px; margin: 10px auto; border: 2px solid #333; display: block;">
+        <canvas id="mapCanvas" style="width: 100%; max-width: 400px; height: 100px; border-radius: 10px; margin: -114px auto 14px; border: 2px solid #333; display: block; background: rgba(0,0,0,0.5);"></canvas>
         <p>記録: <span id="final-score">0</span>m</p>
+        <p id="rank-display" style="font-size: 20px; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px black; margin: 5px 0;"></p>
         <p style="color: #FF4500; font-weight: bold;">死因: <span id="death-reason">不明</span></p>
         <div class="blink">TAP TO RETRY</div>
+        <button id="replay-btn" style="margin-top: 10px; padding: 10px 20px; background-color: #FF8C00; color: white; border: none; border-radius: 20px; font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: bold; cursor: pointer; font-size: 14px; display: block; margin-left: auto; margin-right: auto;">🎥 ダイジェスト再生</button>
+        <button id="share-btn" style="margin-top: 15px; padding: 10px 20px; background-color: #000; color: white; border: none; border-radius: 20px; font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: bold; cursor: pointer; font-size: 14px;">Xでシェア</button>
     </div>
 
     <div id="pause-screen" class="message-box" style="display: none;">
         <h1>PAUSED</h1>
         <div class="blink">TAP TO RESUME</div>
+    </div>
+
+    <div id="replay-ui" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: auto; display: none;">
+        <button id="skip-replay-btn" class="diff-btn" style="background-color: #757575;">SKIP</button>
     </div>
 </div>
 
@@ -202,7 +241,7 @@ const CONSTANTS = {
     JUMP_FORCE_Y: -5.0, // 上方向への力
     JUMP_FORCE_X: -4.0, // 後方への力（バック）
     AUTO_FORWARD_SPEED: 1.5, // 何もしない時に前（右）に戻る力
-    SCROLL_SPEED: 3.0, // 背景・敵のスクロール速度
+    SCROLL_SPEED: 3.5, // 背景・敵のスクロール速度
     SHRIMP_COLOR: '#FF6F61',
     SHRIMP_BASE_SIZE: 20,
     MAX_LIVES: 5,
@@ -217,7 +256,8 @@ const STATE = {
     PLAYING: 1,
     GAMEOVER: 2,
     PAUSED: 3,
-    BITTEN: 4 // ヒラメに食べられている状態
+    BITTEN: 4, // ヒラメに食べられている状態
+    REPLAY: 5  // リプレイ再生中
 };
 
 /**
@@ -226,7 +266,10 @@ const STATE = {
 class SoundManager {
     constructor() {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.bgmInterval = null;
+        this.bgmTimer = null;
+        this.bgmStep = 0;
+        this.bgmTempo = 250;
+        this.bgmPitchRate = 1.0;
     }
 
     init() {
@@ -284,24 +327,37 @@ class SoundManager {
         this.playTone(800 + Math.random() * 200, 'sine', 0.05, 0.02);
     }
 
+    setBGMParams(score) {
+        // スコア(深度)に応じてテンポを遅く、ピッチを低くする
+        // 0m: 250ms, 1.0
+        // 2000m: 400ms, 0.6
+        const ratio = Math.min(score / 2000, 1.0);
+        this.bgmTempo = 250 + ratio * 150;
+        this.bgmPitchRate = 1.0 - ratio * 0.4;
+    }
+
     startBGM() {
-        if (this.bgmInterval) return;
-        let step = 0;
+        if (this.bgmTimer) return;
+        this.playBGMStep();
+    }
+
+    playBGMStep() {
         const notes = [196, 0, 261, 0, 220, 0, 196, 0]; // G3, C4, A3, G3
-        this.bgmInterval = setInterval(() => {
-            if (this.ctx.state === 'suspended') return;
-            const freq = notes[step % notes.length];
-            if (freq > 0) {
-                this.playTone(freq, 'triangle', 0.2, 0.03);
+        
+        if (this.ctx.state !== 'suspended') {
+            const baseFreq = notes[this.bgmStep % notes.length];
+            if (baseFreq > 0) {
+                this.playTone(baseFreq * this.bgmPitchRate, 'triangle', 0.2, 0.03);
             }
-            step++;
-        }, 250);
+        }
+        this.bgmStep++;
+        this.bgmTimer = setTimeout(() => this.playBGMStep(), this.bgmTempo);
     }
 
     stopBGM() {
-        if (this.bgmInterval) {
-            clearInterval(this.bgmInterval);
-            this.bgmInterval = null;
+        if (this.bgmTimer) {
+            clearTimeout(this.bgmTimer);
+            this.bgmTimer = null;
         }
     }
 }
@@ -322,14 +378,23 @@ class Game {
         this.lives = 3;
         this.level = 0;
         this.scrollSpeed = CONSTANTS.SCROLL_SPEED;
+        this.difficulty = 'NORMAL';
+        this.scrollOffset = 0;
+        this.isRapidCurrent = false;
+        this.rapidCurrentTimer = 0;
+        this.streamLines = []; // 激流のエフェクト
+        this.replayBuffer = []; // リプレイ用データ
+        this.replayIndex = 0;
+        this.replayDummies = {}; // リプレイ描画用のダミーインスタンス
         this.lastBossDistance = 0;
         this.sound = new SoundManager();
 
         this.player = new Shrimp(this.width / 3, this.height / 2);
         this.enemies = [];
         this.items = []; // パールなど
-        this.seaweeds = []; // わかめ
+        this.decorations = []; // わかめ、岩、サンゴ
         this.particles = [];
+        this.floatingTexts = []; // フローティングテキスト
 
         // UI要素
         this.uiScore = document.getElementById('score');
@@ -338,12 +403,56 @@ class Game {
         this.uiHighScore = document.getElementById('high-score');
         this.uiFinalScore = document.getElementById('final-score');
         this.uiDeathReason = document.getElementById('death-reason');
+        this.uiRank = document.getElementById('rank-display');
         this.uiLevelUp = document.getElementById('level-up-msg');
         this.uiPauseBtn = document.getElementById('pause-btn');
         this.uiWarning = document.getElementById('warning-msg');
         this.screenStart = document.getElementById('start-screen');
         this.screenGameOver = document.getElementById('gameover-screen');
         this.screenPause = document.getElementById('pause-screen');
+
+        // UI for replay
+        this.uiReplay = document.getElementById('replay-ui');
+        this.btnSkipReplay = document.getElementById('skip-replay-btn');
+
+        // リプレイ用ダミーの初期化
+        this.initReplayDummies();
+
+        // 難易度ボタン
+        this.btnEasy = document.getElementById('btn-easy');
+        this.btnNormal = document.getElementById('btn-normal');
+        this.btnHard = document.getElementById('btn-hard');
+
+        const startHandler = (diff) => (e) => {
+            e.stopPropagation();
+            if (this.state !== STATE.START) return;
+            this.sound.init();
+            this.startGame(diff);
+        };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnEasy.addEventListener(evt, startHandler('EASY')));
+        ['mousedown', 'touchstart'].forEach(evt => this.btnNormal.addEventListener(evt, startHandler('NORMAL')));
+        ['mousedown', 'touchstart'].forEach(evt => this.btnHard.addEventListener(evt, startHandler('HARD')));
+
+        // リプレイボタン
+        this.btnReplay = document.getElementById('replay-btn');
+        const replayHandler = (e) => { e.stopPropagation(); this.startReplay(); };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnReplay.addEventListener(evt, replayHandler));
+
+        // スキップボタン
+        const skipReplayHandler = (e) => { e.stopPropagation(); this.gameOver(this.deathReason); };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnSkipReplay.addEventListener(evt, skipReplayHandler));
+
+        // シェアボタン
+        this.btnShare = document.getElementById('share-btn');
+        this.btnShare.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const text = `えびちゃん（仮）で${Math.floor(this.score)}m泳ぎました！\n死因: ${this.deathReason}\n難易度: ${this.difficulty}`;
+            const url = 'https://umaumax.github.io/ebi-game/';
+            const hashtags = 'えびちゃんゲーム';
+            // シンプルなIntent共有に変更
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${encodeURIComponent(hashtags)}`;
+            window.open(twitterUrl, '_blank');
+        });
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -353,6 +462,28 @@ class Game {
         this.uiHighScore.innerText = this.highScore;
         this.loop = this.loop.bind(this);
         requestAnimationFrame(this.loop);
+    }
+
+    initReplayDummies() {
+        // クラス名からインスタンスを引けるようにマップを作成
+        const classes = [
+            Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, 
+            SeaUrchin, Octopus, Porcupinefish, Needle, Whirlpool, Whale,
+            Pearl, Plankton, FriendShrimp, Clownfish, GardenEel,
+            Seaweed, Rock, Coral, StreamLine, Bubble
+        ];
+        classes.forEach(cls => {
+            try {
+                // 引数なし、あるいは適当な引数でインスタンス化
+                // 一部のクラスは引数が必要だが、描画に使うプロパティは後で上書きするのでエラーにならなければOK
+                if (cls === Shark) this.replayDummies[cls.name] = new cls(0, 0, null);
+                else if (cls === Porcupinefish) this.replayDummies[cls.name] = new cls(0, 0, this);
+                else this.replayDummies[cls.name] = new cls(0, 0);
+            } catch (e) {
+                console.error("Dummy init failed for", cls.name, e);
+            }
+        });
+        this.replayDummies['Shrimp'] = new Shrimp(0, 0);
     }
 
     resize() {
@@ -365,7 +496,11 @@ class Game {
     setupInput() {
         const action = (e) => {
             this.sound.init(); // ユーザー操作でオーディオコンテキストを開始
-            // ポーズボタンのクリックは別処理
+            
+            // ボタン操作時は何もしない（ボタンのハンドラに任せる）
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+
+            // ポーズボタン
             if (e.target === this.uiPauseBtn) {
                 this.togglePause();
                 return;
@@ -375,7 +510,10 @@ class Game {
             if (e.type === 'touchstart') e.preventDefault(); // スクロール防止
 
             if (this.state === STATE.START) {
-                this.startGame();
+                // スペースキーでもNORMALで開始できるようにする
+                if (e.type === 'keydown' && e.code === 'Space') {
+                    this.startGame('NORMAL');
+                }
             } else if (this.state === STATE.PLAYING) {
                 this.player.jump();
                 this.sound.playJump();
@@ -384,6 +522,9 @@ class Game {
             } else if (this.state === STATE.GAMEOVER) {
                 // 少し待ってからリスタート可能に（誤操作防止）
                 if (this.frameCount > 30) this.resetGame();
+            } else if (this.state === STATE.REPLAY) {
+                // リプレイ中はタップで終了
+                this.gameOver(this.deathReason);
             }
         };
 
@@ -406,7 +547,8 @@ class Game {
         }
     }
 
-    startGame() {
+    startGame(difficulty = 'NORMAL') {
+        this.difficulty = difficulty;
         this.state = STATE.PLAYING;
         this.screenStart.style.display = 'none';
         this.screenGameOver.style.display = 'none';
@@ -414,15 +556,26 @@ class Game {
         this.lives = 3;
         this.updateLifeDisplay();
         this.level = 0;
-        this.scrollSpeed = CONSTANTS.SCROLL_SPEED;
+        
+        // 難易度による初期速度設定
+        if (this.difficulty === 'EASY') this.scrollSpeed = 3.0;
+        else if (this.difficulty === 'HARD') this.scrollSpeed = 5.0;
+        else this.scrollSpeed = CONSTANTS.SCROLL_SPEED; // 3.0
+
         this.lastBossDistance = 0;
         this.uiWarning.classList.remove('active');
         this.frameCount = 0;
+        this.scrollOffset = 0;
+        this.isRapidCurrent = false;
+        this.rapidCurrentTimer = 0;
+        this.streamLines = [];
+        this.replayBuffer = [];
         this.sound.startBGM();
         this.enemies = [];
         this.items = [];
-        this.seaweeds = [];
+        this.decorations = [];
         this.particles = [];
+        this.floatingTexts = [];
         this.player.reset(this.width / 3, this.height / 2);
         this.updatePlayerSize();
     }
@@ -434,6 +587,14 @@ class Game {
         this.sound.stopBGM();
     }
 
+    startReplay() {
+        this.state = STATE.REPLAY;
+        this.screenGameOver.style.display = 'none';
+        this.uiReplay.style.display = 'block';
+        this.replayIndex = 0;
+        // リプレイバッファの先頭から再生
+    }
+
     updateLifeDisplay() {
         let hearts = '';
         for(let i=0; i<this.lives; i++) hearts += '❤';
@@ -443,8 +604,10 @@ class Game {
     updatePlayerSize() {
         // ライフが増えるとサイズ（当たり判定）が大きくなる仕様
         // ライフ3を基準(20px)とし、増減でサイズ変化
-        const size = CONSTANTS.SHRIMP_BASE_SIZE + (this.lives - 3) * 5;
-        this.player.radius = Math.max(10, size); // 最小10pxは確保
+        if (this.player) {
+            const size = CONSTANTS.SHRIMP_BASE_SIZE + (this.lives - 3) * 5;
+            this.player.radius = Math.max(10, size); // 最小10pxは確保
+        }
     }
 
     hitPlayer(reason = "不明") {
@@ -479,13 +642,80 @@ class Game {
         this.deathReason = "ヒラメに食べられた";
     }
 
+    getGroundY(x) {
+        const base = this.height - 50;
+        // うねうねさせる
+        return base + Math.sin((x + this.scrollOffset) * 0.005) * 20 + Math.sin((x + this.scrollOffset) * 0.02) * 10;
+    }
+
+    addFloatingText(x, y, text, color) {
+        this.floatingTexts.push(new FloatingText(x, y, text, color));
+    }
+
+    getRank(score) {
+        if (score < 100) return "迷子のエビ";
+        if (score < 300) return "お散歩エビ";
+        if (score < 500) return "冒険者";
+        if (score < 1000) return "深海の旅人";
+        if (score < 2000) return "深淵を覗く者";
+        if (score < 3000) return "深海の主";
+        if (score < 5000) return "伝説の海老";
+        return "深海の覇者";
+    }
+
     gameOver(reason) {
         this.state = STATE.GAMEOVER;
         this.screenGameOver.style.display = 'block';
+        
+        // スクリーンショット生成
+        const dataUrl = this.canvas.toDataURL();
+        document.getElementById('screenshot').src = dataUrl;
+
         this.sound.stopBGM();
+        this.uiReplay.style.display = 'none'; // スキップボタンを隠す
         this.uiFinalScore.innerText = Math.floor(this.score);
+        this.uiRank.innerText = `称号: ${this.getRank(this.score)}`;
         this.uiDeathReason.innerText = reason || this.deathReason;
         
+        // リプレイボタンの表示制御（データがある場合のみ）
+        if (this.replayBuffer.length > 0) {
+            this.btnReplay.style.display = 'block';
+        } else {
+            this.btnReplay.style.display = 'none';
+        }
+
+        // 移動経路マップの描画
+        const mapCanvas = document.getElementById('mapCanvas');
+        const mapCtx = mapCanvas.getContext('2d');
+        mapCanvas.width = 400;
+        mapCanvas.height = 100;
+        mapCtx.clearRect(0, 0, 400, 100);
+
+        if (this.replayBuffer.length > 0) {
+            const path = this.replayBuffer.map(s => s.player);
+            const minX = Math.min(...path.map(p => p.x));
+            const maxX = Math.max(...path.map(p => p.x));
+            const minY = 0; // 常に水面から
+            const maxY = this.height; // 地面まで
+
+            const scaleX = 380 / (maxX - minX || 1);
+            const scaleY = 80 / (maxY - minY || 1);
+
+            mapCtx.strokeStyle = '#FF6F61';
+            mapCtx.lineWidth = 2;
+            mapCtx.beginPath();
+            path.forEach((p, i) => {
+                const x = 10 + (p.x - minX) * scaleX;
+                const y = 10 + (p.y - minY) * scaleY;
+                if (i === 0) {
+                    mapCtx.moveTo(x, y);
+                } else {
+                    mapCtx.lineTo(x, y);
+                }
+            });
+            mapCtx.stroke();
+        }
+
         if (this.score > this.highScore) {
             this.highScore = Math.floor(this.score);
             localStorage.setItem('ebi_highscore', this.highScore);
@@ -496,42 +726,74 @@ class Game {
 
     spawnEnemy() {
         // ボス出現中は雑魚敵を出さない
-        if (this.uiWarning.classList.contains('active') || this.enemies.some(e => e instanceof BossFish)) {
+        if (this.uiWarning.classList.contains('active') || this.enemies.some(e => e instanceof Whale)) {
             return;
         }
 
         // 難易度調整: 時間経過で出現頻度が上がる
         // 距離が進むにつれて障害物の隙間を狭くする（出現頻度アップ）
-        const spawnRate = Math.max(25, 90 - Math.floor(this.score / 25));
+        let baseRate = 90;
+        let minRate = 25;
+        
+        if (this.difficulty === 'EASY') {
+            baseRate = 100;
+            minRate = 35;
+        } else if (this.difficulty === 'HARD') {
+            baseRate = 45;
+            minRate = 12;
+        } else {
+            baseRate = 70;
+            minRate = 20;
+        }
+
+        const spawnRate = Math.max(minRate, baseRate - Math.floor(this.score / 25));
         
         if (this.frameCount % spawnRate === 0) {
             const type = Math.random();
-            if (type < 0.3) {
-                // 魚 (30%)
+            const isDeep = this.score > 1000; // 1000m超えたら深海
+
+            // 深海なら一定確率で提灯鮟鱇
+            if (isDeep && Math.random() < 0.3) {
+                this.enemies.push(new Anglerfish(this.width, Math.random() * (this.height - 100) + 50));
+            } else if (type < 0.20) {
+                // 魚 (20%)
                 this.enemies.push(new Fish(this.width, Math.random() * (this.height - 100) + 50));
-            } else if (type < 0.45) {
+            } else if (type < 0.35) {
                 // イワシの群れ (15%)
                 const baseY = Math.random() * (this.height - 150) + 50;
-                for(let i=0; i<5; i++) {
-                    this.enemies.push(new Sardine(this.width + i * 60 + Math.random()*30, baseY + Math.random()*40 - 20));
+                const count = Math.floor(Math.random() * 6) + 10; // 10~15匹
+                for(let i=0; i<count; i++) {
+                    this.enemies.push(new Sardine(this.width + Math.random() * 200, baseY + Math.random()*80 - 40));
                 }
-            } else if (type < 0.55) {
-                // マグロ (10%)
+            } else if (type < 0.45) {
+                // マグロ (10%) - 直進高速
                 this.enemies.push(new Tuna(this.width, Math.random() * (this.height - 100) + 50));
-            } else if (type < 0.70) {
-                // 網 (15%)
+            } else if (type < 0.50) {
+                // サメ (5%) - ホーミング
+                this.enemies.push(new Shark(this.width, Math.random() * (this.height - 100) + 50, this.player));
+            } else if (type < 0.60) {
+                // 網 (10%)
                 this.enemies.push(new Net(this.width, Math.random() * (this.height - 200) + 100));
-            } else if (type < 0.80) {
+            } else if (type < 0.70) {
                 // 釣り針 (10%)
                 this.enemies.push(new Hook(this.width, -100));
-            } else if (type < 0.90) {
+            } else if (type < 0.80) {
                 // イカ (10%)
                 this.enemies.push(new Squid(this.width, Math.random() * (this.height - 200) + 100));
-            } else if (type < 0.95) {
-                // 潜む魚 (5%) - 海底に出現
+            } else if (type < 0.90) {
+                // タコ (5%) - 新規
+                this.enemies.push(new Octopus(this.width, Math.random() * (this.height - 200) + 100));
+            } else if (type < 0.93) {
+                // ハリセンボン (5%) - 新規
+                this.enemies.push(new Porcupinefish(this.width, Math.random() * (this.height - 100) + 50, this));
+            } else if (type < 0.96) {
+                // うずしお (3%) - 画面上部に出現
+                this.enemies.push(new Whirlpool(this.width, Math.random() * 80 + 40));
+            } else if (type < 0.98) {
+                // 潜む魚 (3%) - 海底に出現
                 this.enemies.push(new Flatfish(this.width, this.height - 40));
             } else {
-                // うに (5%) - 海底に配置
+                // うに (2%) - 海底に配置
                 this.enemies.push(new SeaUrchin(this.width, this.height - 65));
             }
         }
@@ -545,15 +807,31 @@ class Game {
     }
 
     spawnDecorations() {
-        // わかめ (頻繁に)
-        if (this.frameCount % 15 === 0) {
-            // 海底から生やす
-            this.seaweeds.push(new Seaweed(this.width, this.height - 50));
+        const groundY = this.getGroundY(this.width);
+
+        // 海底の装飾 (わかめ、岩、サンゴ)
+        if (this.frameCount % 30 === 0) { // 岩ゾーンのために少し頻度を戻す
+            const rand = Math.random();
+            if (rand < 0.6) {
+                this.decorations.push(new Seaweed(this.width, groundY));
+                // わかめに混じってチンアナゴ
+                if (Math.random() < 0.1) { // 出現率を下げる
+                    this.items.push(new GardenEel(this.width + 20, groundY));
+                }
+            } else if (rand < 0.85) { // 岩の確率を少し上げる
+                this.decorations.push(new Rock(this.width, groundY));
+            } else {
+                this.decorations.push(new Coral(this.width, groundY));
+                // サンゴ礁にカクレクマノミ
+                if (Math.random() < 0.5) {
+                    this.items.push(new Clownfish(this.width, this.height - 80));
+                }
+            }
         }
         // パール (たまに)
         if (this.frameCount % 300 === 0) {
             // 海底に配置
-            this.items.push(new Pearl(this.width, this.height - 65));
+            this.items.push(new Pearl(this.width, groundY - 15));
         }
         // プランクトン (頻繁に)
         if (this.frameCount % 100 === 0) {
@@ -565,7 +843,78 @@ class Game {
         }
     }
 
+    scatterItems(x, y) {
+        // 大量のパール（重力で落ちる）
+        for(let k=0; k<8; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            this.items.push(new Pearl(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed));
+        }
+        // 大量のプランクトン（ふわふわ広がる）
+        for(let k=0; k<15; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            this.items.push(new Plankton(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed));
+        }
+    }
+
+    recordState() {
+        // 2フレームに1回記録（メモリ節約）
+        if (this.frameCount % 2 !== 0) return;
+
+        const snapshot = {
+            player: {
+                x: this.player.x, y: this.player.y, 
+                angle: this.player.angle, isBending: this.player.isBending,
+                lives: this.lives
+            },
+            scrollOffset: this.scrollOffset,
+            score: this.score,
+            objects: []
+        };
+
+        // 描画に必要なオブジェクトの状態を保存
+        const saveObj = (obj) => {
+            const data = {
+                type: obj.constructor.name,
+                x: obj.x, y: obj.y,
+                // 各クラス固有の描画パラメータ
+                angle: obj.angle,
+                timer: obj.timer,
+                moveTimer: obj.moveTimer,
+                hasExploded: obj.hasExploded,
+                width: obj.width, height: obj.height, // Rock, Seaweed
+                color: obj.color, // Rock, Coral
+                branches: obj.branches, // Coral
+                life: obj.life, size: obj.size, isBackground: obj.isBackground, // Bubble
+                length: obj.length // StreamLine
+            };
+            snapshot.objects.push(data);
+        };
+
+        this.decorations.forEach(saveObj);
+        this.items.forEach(saveObj);
+        this.enemies.forEach(saveObj);
+        this.particles.forEach(saveObj);
+        this.streamLines.forEach(saveObj);
+
+        this.replayBuffer.push(snapshot);
+        // バッファ制限（約10秒分 = 60fps/2 * 10 = 300フレーム）
+        if (this.replayBuffer.length > 300) {
+            this.replayBuffer.shift();
+        }
+    }
+
     update() {
+        if (this.state === STATE.REPLAY) {
+            this.replayIndex++;
+            if (this.replayIndex >= this.replayBuffer.length) {
+                // リプレイ終了
+                this.gameOver(this.deathReason);
+            }
+            return;
+        }
+
         if (this.state !== STATE.PLAYING) {
             if (this.state === STATE.GAMEOVER) this.frameCount++;
             return;
@@ -573,7 +922,14 @@ class Game {
 
         this.frameCount++;
         this.score += 0.1; // 距離加算
+        this.scrollOffset += this.scrollSpeed;
         this.uiScore.innerText = Math.floor(this.score);
+
+        // 状態記録（リプレイ用）
+        this.recordState();
+
+        // BGMパラメータ更新
+        this.sound.setBGMParams(this.score);
 
         // ボス出現判定
         if (this.score - this.lastBossDistance >= CONSTANTS.BOSS_INTERVAL) {
@@ -585,7 +941,7 @@ class Game {
             setTimeout(() => {
                 this.uiWarning.classList.remove('active');
                 if (this.state === STATE.PLAYING) {
-                    this.enemies.push(new BossFish(this.width, this.height / 2));
+                    this.enemies.push(new Whale(this.width, this.height / 2));
                 }
             }, 3000);
         }
@@ -602,8 +958,35 @@ class Game {
             this.showLevelUp();
         }
 
+        // 激流ゾーンの制御
+        this.rapidCurrentTimer++;
+        // 約20秒ごとに5秒間激流にする
+        // 難易度が高いほど頻繁に
+        const rapidCurrentInterval = this.difficulty === 'HARD' ? 800 : 1200;
+        if (!this.isRapidCurrent && this.rapidCurrentTimer > rapidCurrentInterval) {
+            if (Math.random() < 0.02) { // ランダム性を持たせる
+                this.isRapidCurrent = true;
+                this.rapidCurrentTimer = 0;
+                this.addFloatingText(this.width / 2, this.height / 2, "激流注意！", "#FF4500");
+            }
+        } else if (this.isRapidCurrent) {
+            if (this.rapidCurrentTimer > 300) {
+                this.isRapidCurrent = false;
+                this.rapidCurrentTimer = 0;
+            }
+            // プレイヤーを左に押し流す力
+            this.player.vx -= 0.15;
+        }
+
         // プレイヤー更新
-        this.player.update(this.width, this.height);
+        this.player.update(this);
+
+        // 画面左端ゲームオーバー判定
+        if (this.player.x < -this.player.radius) {
+            this.lives = 0;
+            this.gameOver("波に飲まれた"); // 無敵時間を無視して即ゲームオーバー
+            return;
+        }
 
         // 敵生成と更新
         this.spawnEnemy();
@@ -611,7 +994,13 @@ class Game {
         
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
-            enemy.update(this.scrollSpeed);
+            enemy.update(this.scrollSpeed, this); // Hookのためにthis(game)を渡す
+
+            // 安全策: 座標がNaNになった敵は削除（フリーズ防止）
+            if (!isFinite(enemy.x) || !isFinite(enemy.y)) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
 
             // 画面外判定
             if (enemy.isOffScreen(this.width, this.height)) {
@@ -630,9 +1019,14 @@ class Game {
                     else if (enemy instanceof Sardine) reason = "イワシの群れに巻き込まれた";
                     else if (enemy instanceof Tuna) reason = "マグロに激突された";
                     else if (enemy instanceof Hook) reason = "釣り針に引っかかった";
+                    else if (enemy instanceof Anglerfish) reason = "提灯鮟鱇に食べられた";
+                    else if (enemy instanceof Shark) reason = "サメに噛まれた";
                     else if (enemy instanceof Net) reason = "網に捕まった";
                     else if (enemy instanceof Squid) reason = "イカにぶつかった";
-                    else if (enemy instanceof BossFish) reason = "巨大魚に食べられた";
+                    else if (enemy instanceof Octopus) reason = "タコに捕まった";
+                    else if (enemy instanceof Porcupinefish || enemy instanceof Needle) reason = "ハリセンボンの針が刺さった";
+                    else if (enemy instanceof Whirlpool) reason = "うずしおに巻き込まれた";
+                    else if (enemy instanceof Whale) reason = "巨大クジラに衝突した";
                     else if (enemy instanceof SeaUrchin) reason = "うにに刺さった";
                     this.hitPlayer(reason);
                 }
@@ -642,8 +1036,14 @@ class Game {
         // アイテム更新
         for (let i = this.items.length - 1; i >= 0; i--) {
             const item = this.items[i];
-            item.update(this.scrollSpeed);
+            item.update(this.scrollSpeed, this); // gameを渡す
             
+            // 安全策
+            if (!isFinite(item.x) || !isFinite(item.y)) {
+                this.items.splice(i, 1);
+                continue;
+            }
+
             if (item.isOffScreen(this.width, this.height)) {
                 this.items.splice(i, 1);
                 continue;
@@ -653,24 +1053,69 @@ class Game {
                 this.sound.playItem();
                 if (item instanceof Pearl) {
                     this.score += 50;
-                } else if (item instanceof Plankton) {
-                    this.score += 10;
-                } else if (item instanceof FriendShrimp) {
+                    this.addFloatingText(item.x, item.y, "+50", "#FFD700");
+                } else if (item instanceof FriendShrimp) { // Planktonより先に判定する
                     if (this.lives < CONSTANTS.MAX_LIVES) {
                         this.lives++;
                         this.updateLifeDisplay();
                         this.updatePlayerSize();
+                        this.addFloatingText(item.x, item.y, "1UP!", "#FF69B4");
+                    } else {
+                        // ライフ満タンならスコアボーナス
+                        this.score += 100;
+                        this.addFloatingText(item.x, item.y, "+100", "#FFD700");
                     }
+                } else if (item instanceof Plankton) {
+                    this.score += 10;
+                    this.addFloatingText(item.x, item.y, "+10", "#90EE90");
+                } else if (item instanceof Clownfish) {
+                    this.score += 50;
+                    this.addFloatingText(item.x, item.y, "+50", "#FF4500");
+                } else if (item instanceof GardenEel) {
+                    this.score += 30;
+                    this.addFloatingText(item.x, item.y, "+30", "#FFFFFF");
                 }
                 this.items.splice(i, 1);
             }
         }
 
-        // わかめ更新
-        for (let i = this.seaweeds.length - 1; i >= 0; i--) {
-            const weed = this.seaweeds[i];
-            weed.update(this.scrollSpeed);
-            if (weed.x < -50) this.seaweeds.splice(i, 1);
+        // 装飾更新
+        for (let i = this.decorations.length - 1; i >= 0; i--) {
+            const deco = this.decorations[i];
+            deco.update(this.scrollSpeed, this);
+            
+            // 画面外判定修正: 岩などが完全に消えてから削除
+            if (deco.x < -200) this.decorations.splice(i, 1);
+
+            // 岩の当たり判定
+            if (deco instanceof Rock) {
+                const pBottom = this.player.y + this.player.radius;
+                const rockTop = deco.y - deco.height;
+
+                // 上に乗っているかどうかの判定
+                const isOnTop = pBottom > rockTop && pBottom < rockTop + 15 &&
+                                this.player.x > deco.x && this.player.x < deco.x + deco.width;
+
+                if (isOnTop) {
+                    // 上に乗っている場合は何もしない（Shrimp.updateで処理）
+                }
+                // 横からぶつかった場合
+                else if (deco.checkCollision(this.player)) {
+                    // 岩の左側に押し出す
+                    this.player.x = deco.x - this.player.radius;
+                    if (this.player.vx > 0) this.player.vx = 0;
+                }
+            }
+        }
+
+        // 激流エフェクト（ストリームライン）
+        if (this.isRapidCurrent && this.frameCount % 5 === 0) {
+            this.streamLines.push(new StreamLine(this.width, Math.random() * this.height));
+        }
+        for (let i = this.streamLines.length - 1; i >= 0; i--) {
+            // 激流時はスクロールも速く見えるように
+            this.streamLines[i].update(this.scrollSpeed + 10);
+            if (this.streamLines[i].x < -200) this.streamLines.splice(i, 1);
         }
 
         // パーティクル（泡）
@@ -678,24 +1123,51 @@ class Game {
             this.particles.push(new Bubble(this.player.x, this.player.y));
             if (Math.random() < 0.05) this.sound.playBubble(); // たまに音を鳴らす
         }
+
+        // 背景の泡（スコアに応じて増える演出）
+        // 深度(score)に応じて発生確率と数を上げる
+        const bubbleDensity = Math.min(20, Math.floor(this.score / 300)); 
+        if (this.frameCount % 15 === 0) {
+            // 基本確率 + スコアボーナス
+            if (Math.random() < 0.2 + (bubbleDensity * 0.05)) {
+                // 画面下部からランダムに発生
+                this.particles.push(new Bubble(Math.random() * (this.width + 100), this.height + 10, true));
+            }
+        }
+
         for (let i = this.particles.length - 1; i >= 0; i--) {
             this.particles[i].update(this.scrollSpeed);
             if (this.particles[i].life <= 0) this.particles.splice(i, 1);
         }
+
+        // フローティングテキスト更新
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            this.floatingTexts[i].update();
+            if (this.floatingTexts[i].life <= 0) this.floatingTexts.splice(i, 1);
+        }
     }
 
     draw() {
+        if (this.state === STATE.REPLAY) {
+            this.drawReplay();
+            return;
+        }
+
         // ヒラメ捕食演出中の描画
         if (this.state === STATE.BITTEN) {
             this.bittenTimer++;
+            
+            // 画面シェイク演出
+            const shakeX = (Math.random() - 0.5) * 20;
+            const shakeY = (Math.random() - 0.5) * 20;
+            this.ctx.save();
+            this.ctx.translate(shakeX, shakeY);
+
             // 背景などはそのまま
             // ヒラメを描画（口を閉じるアニメーションなど）
             this.killerEnemy.draw(this.ctx, true); // true = 捕食中
             
-            // ガブッ！テキスト
-            this.ctx.fillStyle = 'red';
-            this.ctx.font = 'bold 40px Arial';
-            this.ctx.fillText('GABU!!', this.killerEnemy.x - 20, this.killerEnemy.y - 30);
+            this.ctx.restore();
 
             // 一定時間後にゲームオーバー
             if (this.bittenTimer > 60) {
@@ -714,18 +1186,35 @@ class Game {
         const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
         const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
 
-        this.ctx.fillStyle = `rgb(${r},${g},${b})`;
+        // 背景グラデーション (上から光が差し込む表現)
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+        gradient.addColorStop(0, `rgb(${Math.min(255, r+30)},${Math.min(255, g+30)},${Math.min(255, b+30)})`);
+        gradient.addColorStop(1, `rgb(${r},${g},${b})`);
+        this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         // 海底の描画（砂）
+        // うねうねさせる
         this.ctx.fillStyle = '#E0C090'; // 砂っぽい色
-        this.ctx.fillRect(0, this.height - 50, this.width, 50);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.height);
+        for (let x = 0; x <= this.width; x += 10) {
+            this.ctx.lineTo(x, this.getGroundY(x));
+        }
+        this.ctx.lineTo(this.width, this.height);
+        this.ctx.fill();
 
-        // わかめ描画（背景扱い）
-        this.seaweeds.forEach(w => w.draw(this.ctx, this.frameCount));
+        // 装飾描画（背景扱い）
+        this.decorations.forEach(d => d.draw(this.ctx, this.frameCount));
+
+        // 激流エフェクト描画
+        this.streamLines.forEach(l => l.draw(this.ctx));
 
         // アイテム描画
         this.items.forEach(i => i.draw(this.ctx));
+
+        // フローティングテキスト描画
+        this.floatingTexts.forEach(t => t.draw(this.ctx));
 
         // パーティクル描画
         this.particles.forEach(p => p.draw(this.ctx));
@@ -734,9 +1223,81 @@ class Game {
         this.enemies.forEach(e => e.draw(this.ctx));
 
         // プレイヤー描画
-        this.player.draw(this.ctx, this.lives);
+        this.player.draw(this.ctx, this.lives, this.decorations);
     }
 
+    drawReplay() {
+        const snapshot = this.replayBuffer[this.replayIndex];
+        if (!snapshot) return;
+
+        // 背景描画（共通処理の一部再利用）
+        const maxDepth = 2000;
+        const ratio = Math.min(snapshot.score / maxDepth, 1);
+        const r = Math.floor(135 * (1 - ratio) + 0 * ratio);
+        const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
+        const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+        gradient.addColorStop(0, `rgb(${Math.min(255, r+30)},${Math.min(255, g+30)},${Math.min(255, b+30)})`);
+        gradient.addColorStop(1, `rgb(${r},${g},${b})`);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // 地面
+        this.ctx.fillStyle = '#E0C090';
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.height);
+        // 地面のうねりはscrollOffsetに依存するため、snapshotの値を使用
+        const getGroundY = (x) => {
+            const base = this.height - 50;
+            return base + Math.sin((x + snapshot.scrollOffset) * 0.005) * 20 + Math.sin((x + snapshot.scrollOffset) * 0.02) * 10;
+        };
+        for (let x = 0; x <= this.width; x += 10) {
+            this.ctx.lineTo(x, getGroundY(x));
+        }
+        this.ctx.lineTo(this.width, this.height);
+        this.ctx.fill();
+
+        // オブジェクト描画
+        snapshot.objects.forEach(data => {
+            const dummy = this.replayDummies[data.type];
+            if (dummy) {
+                Object.assign(dummy, data); // プロパティをコピー
+                dummy.draw(this.ctx, this.frameCount); // frameCountはアニメーション用だが、リプレイでは進行し続ける値で代用
+            }
+        });
+
+        // プレイヤー描画
+        const pData = snapshot.player;
+        const pDummy = this.replayDummies['Shrimp'];
+        Object.assign(pDummy, pData);
+        
+        // 仲間エビの描画（履歴から復元）
+        // リプレイバッファ自体を履歴として使う
+        const followerCount = Math.max(0, pData.lives - 1);
+        for (let i = 1; i <= followerCount; i++) {
+            // 2フレームに1回記録しているので、遅延フレーム数(8) / 2 = 4インデックス前を参照
+            const delayIdx = i * 4;
+            const prevSnapshot = this.replayBuffer[this.replayIndex - delayIdx];
+            if (prevSnapshot) {
+                Object.assign(pDummy, prevSnapshot.player);
+                // 仲間描画用の特別なモードがあればいいが、ここでは簡易的に位置だけ合わせて描画
+                // 本来のShrimp.drawロジックを再利用するのは少し複雑なので、メインのdrawと同じロジックをここで再現
+                // ...簡略化のため、プレイヤー本体のみ描画するか、あるいはShrimpクラスに仲間描画ロジックを分離するのが理想
+            }
+        }
+        // 本体描画
+        Object.assign(pDummy, pData); // 戻す
+        // リプレイでは仲間エビの描画を正確に再現するのが難しいため、本体のみ描画（またはlives=1として描画）
+        // ここではlivesを渡して、Shrimp.draw内で履歴(this.history)を使うが、ダミーには履歴がない。
+        // 履歴がないと仲間は描画されないので、違和感はあるが許容する。
+        pDummy.draw(this.ctx, 1); 
+
+        // UI
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '20px sans-serif';
+        this.ctx.fillText("REPLAY", 20, 80);
+    }
+    
     loop() {
         this.update();
         this.draw();
@@ -763,6 +1324,7 @@ class Shrimp {
         this.invincibleTimer = 0;
         this.bendTimer = 0;
         this.history = []; // 軌跡保存用
+        this.recoveryBoostTimer = 0;
     }
 
     jump() {
@@ -771,20 +1333,28 @@ class Shrimp {
         this.vx = CONSTANTS.JUMP_FORCE_X;
         this.isBending = true;
         this.bendTimer = 15; // 変形持続フレーム
+        this.recoveryBoostTimer = 30; // 泳ぎブースト
     }
 
     setInvincible(frames) {
         this.invincibleTimer = frames;
     }
 
-    update(screenWidth, screenHeight) {
+    update(game) {
+        const screenWidth = game.width;
+
         // 重力（徐々に沈む）
         this.vy += CONSTANTS.GRAVITY;
+
+        if (this.recoveryBoostTimer > 0) this.recoveryBoostTimer--;
+        const recoveryForce = (this.recoveryBoostTimer > 0) ? 0.35 : 0.2;
         
         // 自動前進（元の位置に戻ろうとする力）
         // 画面左端に行き過ぎないように、右方向へ一定の力をかける
-        if (this.x < screenWidth * 0.3) {
-            this.vx += 0.2; // 復帰力を強化
+        if (this.x < this.radius * 4) {
+            this.vx -= 0.5; // 左端に近づくと外側に吸い込まれる（復帰困難に）
+        } else if (this.x < screenWidth * 0.3) {
+            this.vx += recoveryForce; // 頑張って泳ぐと復帰力アップ
         } else {
             // 定位置より前に出過ぎないように減速
             this.vx *= 0.95;
@@ -795,15 +1365,30 @@ class Shrimp {
         this.y += this.vy;
 
         // 画面端制限
+        // 天井
         if (this.y < this.radius) { this.y = this.radius; this.vy = 0; } // 天井
-        if (this.y > screenHeight - this.radius - 50) { // 床（海底）
-            // 床につくとゲームオーバーにするか、跳ねるか。
-            // 仕様には「沈む」とあるので、床につくとゲームオーバー扱いが自然だが、
-            // ここでは簡単のため床を滑る（ただしスクロールで敵が来るので危険）
-            this.y = screenHeight - this.radius - 50;
+        
+        // 地面（海底・岩）との当たり判定
+        let groundY = game.getGroundY(this.x);
+        // 岩の上に乗る判定
+        for (const deco of game.decorations) {
+            if (deco instanceof Rock) {
+                // プレイヤーが岩の水平範囲内にいるか
+                if (this.x > deco.x && this.x < deco.x + deco.width) {
+                    const rockTopY = deco.y - deco.height;
+                    // プレイヤーが岩の上付近にいて、かつ岩が現在の地面より高い場合
+                    if (this.y + this.radius > rockTopY - 10 && rockTopY < groundY) {
+                         groundY = rockTopY;
+                    }
+                }
+            }
+        }
+        if (this.y > groundY - this.radius) { // 地面に着地
+            this.y = groundY - this.radius;
             this.vy = 0;
         }
-        if (this.x < this.radius) this.x = this.radius; // 左壁
+        
+        // 右壁
         if (this.x > screenWidth - this.radius) this.x = screenWidth - this.radius; // 右壁
 
         // 変形タイマー
@@ -812,6 +1397,12 @@ class Shrimp {
         } else {
             this.isBending = false;
         }
+
+        // NaNガード
+        if (isNaN(this.x)) { this.x = 100; this.vx = 0; }
+        if (isNaN(this.y)) { this.y = 100; this.vy = 0; }
+        if (isNaN(this.vx)) this.vx = 0;
+        if (isNaN(this.vy)) this.vy = 0;
 
         // 履歴の更新（追従用）
         this.history.unshift({x: this.x, y: this.y, angle: this.angle, isBending: this.isBending});
@@ -836,7 +1427,7 @@ class Shrimp {
         return this.invincibleTimer > 0;
     }
 
-    draw(ctx, lives = 1) {
+    draw(ctx, lives = 1, decorations = []) {
         // 無敵時間は点滅
         if (this.isInvincible && Math.floor(Date.now() / 100) % 2 === 0) return;
 
@@ -848,6 +1439,16 @@ class Shrimp {
             const delay = i * 8;
             if (this.history[delay]) {
                 const pos = this.history[delay];
+                // 安全策: 履歴が不正な場合はスキップ
+                const followerDummy = { x: pos.x, y: pos.y, radius: this.radius * 0.7 };
+                let inRock = false;
+                if (decorations) {
+                    inRock = decorations.some(d => d instanceof Rock && d.checkCollision(followerDummy));
+                }
+
+                if (inRock) continue;
+
+                if (!isFinite(pos.x) || !isFinite(pos.y)) continue;
                 ctx.save();
                 ctx.translate(pos.x, pos.y);
                 ctx.rotate(pos.angle);
@@ -855,17 +1456,26 @@ class Shrimp {
                 const scale = 0.7;
                 ctx.scale(scale, scale);
                 // 仲間の色
-                ctx.fillStyle = '#FFB6C1'; // LightPink
+                const fGrad = ctx.createRadialGradient(0, -this.radius*0.2, 0, 0, 0, this.radius);
+                fGrad.addColorStop(0, '#FFC0CB');
+                fGrad.addColorStop(1, '#FFB6C1');
+                ctx.fillStyle = fGrad;
                 this.drawBody(ctx, pos.isBending);
                 ctx.restore();
             }
         }
 
+        // 安全策
+        if (!isFinite(this.x) || !isFinite(this.y)) return;
+
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
-        ctx.fillStyle = CONSTANTS.SHRIMP_COLOR;
+        const grad = ctx.createRadialGradient(0, -this.radius*0.2, 0, 0, 0, this.radius);
+        grad.addColorStop(0, '#FF8E84');
+        grad.addColorStop(1, CONSTANTS.SHRIMP_COLOR);
+        ctx.fillStyle = grad;
         
         this.drawBody(ctx, this.isBending);
 
@@ -873,6 +1483,7 @@ class Shrimp {
     }
 
     drawBody(ctx, isBending) {
+        const baseStyle = ctx.fillStyle;
         // よりリアルでスタイリッシュなエビのデザイン
         if (isBending) {
             // くの字（ジャンプ時）
@@ -901,10 +1512,10 @@ class Shrimp {
                 ctx.arc(-this.radius * 0.5 + i * this.radius * 0.5, -this.radius * 0.2, this.radius * 0.4, 0, Math.PI, false);
                 ctx.fill();
             }
-            ctx.fillStyle = CONSTANTS.SHRIMP_COLOR;
+            ctx.fillStyle = baseStyle;
 
             // 足
-            ctx.strokeStyle = CONSTANTS.SHRIMP_COLOR;
+            ctx.strokeStyle = baseStyle;
             ctx.lineWidth = 2;
             for(let i=0; i<4; i++) {
                 ctx.beginPath();
@@ -940,6 +1551,11 @@ class Shrimp {
         ctx.fillStyle = 'black';
         ctx.beginPath();
         ctx.arc(this.radius * 0.9, -5, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // 目のハイライト
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.9 - 1, -5 - 1, 1, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -978,15 +1594,51 @@ class Fish extends Enemy {
         this.y += Math.sin(this.angle += 0.05) * 1.5;
     }
     draw(ctx) {
-        ctx.fillStyle = '#4682B4'; // SteelBlue
+        // 左向き
+        const grad = ctx.createLinearGradient(this.x + 25, this.y - 15, this.x - 25, this.y + 15);
+        grad.addColorStop(0, '#5F9EA0');
+        grad.addColorStop(1, '#4682B4');
+        ctx.fillStyle = grad;
+        
+        // 体（流線型）
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 20, 12, 0, 0, Math.PI * 2);
+        ctx.moveTo(this.x - 25, this.y); // 頭（左）
+        ctx.quadraticCurveTo(this.x, this.y - 20, this.x + 25, this.y); // 背中
+        ctx.quadraticCurveTo(this.x, this.y + 20, this.x - 25, this.y); // 腹
         ctx.fill();
+        
+        // 鱗模様
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        for(let i=0; i<3; i++) {
+            for(let j=0; j<3; j++) {
+                ctx.beginPath();
+                ctx.arc(this.x + 10 - i*10, this.y - 6 + j*6, 4, 0, Math.PI, false);
+                ctx.fill();
+            }
+        }
+
         // 尾びれ
+        ctx.fillStyle = '#4682B4';
         ctx.beginPath();
-        ctx.moveTo(this.x + 15, this.y);
-        ctx.lineTo(this.x + 30, this.y - 10);
-        ctx.lineTo(this.x + 30, this.y + 10);
+        ctx.moveTo(this.x + 20, this.y);
+        ctx.lineTo(this.x + 35, this.y - 12);
+        ctx.lineTo(this.x + 35, this.y + 12);
+        ctx.fill();
+
+        // 胸ビレ
+        ctx.fillStyle = '#87CEFA';
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y + 3, 8, 4, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 目
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 12, this.y - 5, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 13, this.y - 5, 2, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -1001,7 +1653,10 @@ class Sardine extends Enemy {
         this.x -= (baseSpeed + this.speed);
     }
     draw(ctx) {
-        ctx.fillStyle = '#C0C0C0'; // Silver
+        const grad = ctx.createLinearGradient(this.x, this.y - 6, this.x, this.y + 6);
+        grad.addColorStop(0, '#D3D3D3');
+        grad.addColorStop(1, '#A9A9A9');
+        ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.ellipse(this.x, this.y, 15, 6, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -1017,28 +1672,161 @@ class Tuna extends Enemy {
     constructor(x, y) {
         super(x, y);
         this.radius = 25;
-        this.speed = 8.0; // とても速い
+        this.speed = 10.0; // とても速い
     }
     update(baseSpeed) {
         this.x -= (baseSpeed + this.speed);
     }
     draw(ctx) {
-        ctx.fillStyle = '#000080'; // Navy
+        // メタリックなボディ
+        const grad = ctx.createLinearGradient(this.x - 40, this.y - 20, this.x + 40, this.y + 20);
+        grad.addColorStop(0, '#000080'); // Navy
+        grad.addColorStop(0.4, '#4169E1'); // RoyalBlue
+        grad.addColorStop(1, '#C0C0C0'); // Silver (腹)
+        ctx.fillStyle = grad;
+
+        // 紡錘形の体
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 40, 15, 0, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y, 45, 18, 0, 0, Math.PI * 2);
         ctx.fill();
-        // お腹
-        ctx.fillStyle = '#B0C4DE';
+
+        // 横縞ライン
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y + 5, 35, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // 黄色いヒレ
+        ctx.moveTo(this.x - 30, this.y);
+        ctx.lineTo(this.x + 30, this.y);
+        ctx.stroke();
+
+        // 黄色い小離鰭（背中と腹の後ろの方にあるギザギザ）
         ctx.fillStyle = '#FFD700';
+        for(let i=0; i<5; i++) {
+            // 背側
+            ctx.beginPath();
+            ctx.moveTo(this.x + 10 + i*5, this.y - 16);
+            ctx.lineTo(this.x + 13 + i*5, this.y - 22);
+            ctx.lineTo(this.x + 16 + i*5, this.y - 15);
+            ctx.fill();
+            // 腹側
+            ctx.beginPath();
+            ctx.moveTo(this.x + 10 + i*5, this.y + 16);
+            ctx.lineTo(this.x + 13 + i*5, this.y + 22);
+            ctx.lineTo(this.x + 16 + i*5, this.y + 15);
+            ctx.fill();
+        }
+
+        // 目
+        ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.moveTo(this.x - 10, this.y - 15);
-        ctx.lineTo(this.x + 5, this.y - 25);
-        ctx.lineTo(this.x + 10, this.y - 15);
+        ctx.arc(this.x - 25, this.y - 3, 5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 25, this.y - 3, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Shark extends Enemy {
+    constructor(x, y, player) {
+        super(x, y);
+        this.player = player;
+        this.radius = 30;
+        this.speed = 6.5;
+    }
+    update(baseSpeed) {
+        this.x -= (baseSpeed + this.speed);
+        // ホーミング（プレイヤーのY座標に近づく）
+        if (this.player) {
+            const dy = this.player.y - this.y;
+            this.y += dy * 0.025; // 追尾性能アップ
+        }
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#708090'; // SlateGray
+        
+        // 体
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 40, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 背びれ
+        ctx.beginPath();
+        ctx.moveTo(this.x + 5, this.y - 10);
+        ctx.lineTo(this.x - 5, this.y - 30);
+        ctx.lineTo(this.x - 15, this.y - 10);
+        ctx.fill();
+        
+        // 尾びれ
+        ctx.beginPath();
+        ctx.moveTo(this.x + 35, this.y);
+        ctx.lineTo(this.x + 55, this.y - 15);
+        ctx.lineTo(this.x + 55, this.y + 15);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 25, this.y - 5, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 27, this.y - 5, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // エラ
+        ctx.strokeStyle = '#506070';
+        ctx.lineWidth = 2;
+        for(let i=0; i<3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(this.x - 10 + i*5, this.y - 5);
+            ctx.lineTo(this.x - 10 + i*5, this.y + 5);
+            ctx.stroke();
+        }
+    }
+}
+
+class Anglerfish extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 25;
+        this.angle = Math.random() * Math.PI * 2;
+    }
+    update(speed) {
+        this.x -= speed * 0.7; // 少し遅め
+        this.y += Math.sin(this.angle += 0.03) * 0.5;
+    }
+    draw(ctx) {
+        // 暗い体色
+        ctx.fillStyle = '#191970'; // MidnightBlue
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 30, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 口
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 20, this.y + 5);
+        ctx.lineTo(this.x - 10, this.y + 15);
+        ctx.lineTo(this.x + 10, this.y + 5);
+        ctx.fill();
+        
+        // 提灯の柄
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - 25);
+        ctx.quadraticCurveTo(this.x + 20, this.y - 50, this.x + 40, this.y - 10);
+        ctx.stroke();
+
+        // 提灯の光
+        ctx.fillStyle = '#ADFF2F'; // GreenYellow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ADFF2F';
+        ctx.beginPath();
+        ctx.arc(this.x + 40, this.y - 10, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
     }
 }
 
@@ -1047,14 +1835,21 @@ class Hook extends Enemy {
         // 画面右側に出現させる
         super(x * 0.8 + Math.random() * (x * 0.2), y);
         this.radius = 10;
-        this.vy = 3.5; // 落下速度アップ
+        this.vy = 4.5; // 落下速度アップ
     }
-    update(speed) {
+    update(speed, game) {
         this.x -= speed; // スクロールに合わせて移動
         this.y += this.vy; // 上から下へ
+        if (game) {
+            const groundY = game.getGroundY(this.x);
+            if (this.y > groundY) this.y = groundY;
+        }
     }
     draw(ctx) {
-        ctx.strokeStyle = '#696969'; // DimGray
+        const grad = ctx.createLinearGradient(this.x - 5, this.y, this.x + 5, this.y);
+        grad.addColorStop(0, '#C0C0C0');
+        grad.addColorStop(1, '#696969');
+        ctx.strokeStyle = grad;
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(this.x, -100); // 糸（画面上端より上まで確実に引く）
@@ -1071,28 +1866,51 @@ class Hook extends Enemy {
 class Net extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 45; // さらに大きく
+        this.radius = 60; // 大きく
     }
     draw(ctx) {
-        ctx.strokeStyle = '#8B4513';
+        if (!isFinite(this.x) || !isFinite(this.y)) return;
+
+        ctx.strokeStyle = '#5D4037'; // 濃い茶色
         ctx.lineWidth = 3;
-        ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.2)'; // 薄暗い網の色
+        
+        // 上部のロープ
         ctx.beginPath();
-        const r = 40;
-        ctx.rect(this.x - r, this.y - r, r * 2, r * 2);
+        ctx.moveTo(this.x - 60, this.y - 70);
+        ctx.quadraticCurveTo(this.x, this.y - 60, this.x + 60, this.y - 70);
+        ctx.stroke();
+
+        // 浮き（フロート）
+        ctx.fillStyle = '#FFD700';
+        for(let i=-50; i<=50; i+=25) {
+            ctx.beginPath();
+            ctx.arc(this.x + i, this.y - 65 + Math.abs(i)*0.1, 5, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 網袋
+        ctx.fillStyle = 'rgba(139, 69, 19, 0.1)';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 60, this.y - 70);
+        ctx.bezierCurveTo(this.x - 70, this.y, this.x - 30, this.y + 70, this.x, this.y + 80);
+        ctx.bezierCurveTo(this.x + 30, this.y + 70, this.x + 70, this.y, this.x + 60, this.y - 70);
         ctx.fill();
         ctx.stroke();
-        
-        // 網目模様
+
+        // 網目（クリッピングして描画）
+        ctx.save();
+        ctx.clip();
         ctx.lineWidth = 1;
         ctx.beginPath();
-        for(let i=0; i<=r*2; i+=15) {
-            ctx.moveTo(this.x - r + i, this.y - r);
-            ctx.lineTo(this.x - r + i, this.y + r);
-            ctx.moveTo(this.x - r, this.y - r + i);
-            ctx.lineTo(this.x + r, this.y - r + i);
+        for(let i = -80; i < 80; i += 10) {
+            ctx.moveTo(this.x + i, this.y - 80);
+            ctx.lineTo(this.x + i - 40, this.y + 100);
+            ctx.moveTo(this.x + i, this.y - 80);
+            ctx.lineTo(this.x + i + 40, this.y + 100);
         }
         ctx.stroke();
+        ctx.restore();
     }
 }
 
@@ -1110,15 +1928,40 @@ class Squid extends Enemy {
         this.y = this.baseY + Math.sin(this.timer) * 80;
     }
     draw(ctx) {
-        ctx.fillStyle = '#FFF5EE'; // Seashell (白っぽい色)
+        const grad = ctx.createRadialGradient(this.x, this.y - 10, 0, this.x, this.y, 20);
+        grad.addColorStop(0, '#FFF5EE');
+        grad.addColorStop(1, '#FFE4E1');
+        ctx.fillStyle = grad;
+        
+        // 頭（エンペラ）
         ctx.beginPath();
-        // 三角頭
-        ctx.moveTo(this.x, this.y - 25);
-        ctx.lineTo(this.x + 20, this.y);
-        ctx.lineTo(this.x - 20, this.y);
+        ctx.ellipse(this.x, this.y - 15, 15, 20, 0, Math.PI, 0); // 上半分
+        ctx.lineTo(this.x + 15, this.y);
+        ctx.lineTo(this.x - 15, this.y);
         ctx.fill();
-        // 胴体と足
-        ctx.fillRect(this.x - 20, this.y, 40, 15);
+        
+        // ヒレ
+        ctx.beginPath();
+        ctx.moveTo(this.x - 15, this.y - 25);
+        ctx.lineTo(this.x - 25, this.y - 15);
+        ctx.lineTo(this.x - 13, this.y - 10);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(this.x + 15, this.y - 25);
+        ctx.lineTo(this.x + 25, this.y - 15);
+        ctx.lineTo(this.x + 13, this.y - 10);
+        ctx.fill();
+
+        // 足（触腕）
+        ctx.strokeStyle = '#FFF5EE';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        for(let i=-10; i<=10; i+=5) {
+            ctx.beginPath();
+            ctx.moveTo(this.x + i, this.y);
+            ctx.quadraticCurveTo(this.x + i + Math.sin(this.timer * 2 + i)*5, this.y + 15, this.x + i, this.y + 30);
+            ctx.stroke();
+        }
         
         // 目
         ctx.fillStyle = 'black';
@@ -1138,7 +1981,10 @@ class Flatfish extends Enemy {
         this.mouthOpen = 0;
     }
     draw(ctx, isBiting = false) {
-        ctx.fillStyle = this.color;
+        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, 25);
+        grad.addColorStop(0, '#E6CCB3');
+        grad.addColorStop(1, this.color);
+        ctx.fillStyle = grad;
         ctx.beginPath();
         // 平べったい体
         // 捕食時は少し膨らむ
@@ -1167,7 +2013,10 @@ class SeaUrchin extends Enemy {
         this.radius = 15;
     }
     draw(ctx) {
-        ctx.fillStyle = '#2F4F4F'; // DarkSlateGray
+        const grad = ctx.createRadialGradient(this.x - 3, this.y - 3, 0, this.x, this.y, 10);
+        grad.addColorStop(0, '#4F6F6F');
+        grad.addColorStop(1, '#2F4F4F');
+        ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(this.x, this.y, 10, 0, Math.PI * 2);
         ctx.fill();
@@ -1185,60 +2034,309 @@ class SeaUrchin extends Enemy {
     }
 }
 
-class BossFish extends Enemy {
+class Octopus extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 80; // 巨大
-        this.hp = 100;
+        this.radius = 25;
+        this.angle = Math.random() * Math.PI * 2;
+        this.moveTimer = 0;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.moveTimer += 0.1;
+        // 激しい動き: 大きなサイン波 + 小刻みな震え
+        this.y += Math.sin(this.moveTimer) * 4 + Math.sin(this.moveTimer * 3) * 2;
+    }
+    draw(ctx) {
+        const grad = ctx.createRadialGradient(this.x, this.y - 10, 2, this.x, this.y - 5, 15);
+        grad.addColorStop(0, '#E9967A');
+        grad.addColorStop(1, '#CD5C5C');
+        ctx.fillStyle = grad;
+        // 頭
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y - 15, 20, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 足
+        ctx.strokeStyle = '#CD5C5C';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        for(let i=0; i<4; i++) {
+            ctx.beginPath();
+            const startX = this.x - 15 + i*10;
+            ctx.moveTo(startX, this.y);
+            const sway = Math.sin(this.moveTimer + i) * 10;
+            ctx.quadraticCurveTo(startX + sway, this.y + 20, startX, this.y + 40);
+            ctx.stroke();
+            
+            // 吸盤
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.beginPath();
+            ctx.arc(startX + sway*0.5, this.y + 20, 2, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 目
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 10, 5, 0, Math.PI * 2);
+        ctx.arc(this.x + 8, this.y - 10, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 10, 2, 0, Math.PI * 2);
+        ctx.arc(this.x + 8, this.y - 10, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 口（タコチュー）
+        ctx.strokeStyle = '#8B0000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - 2, 3, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+class Porcupinefish extends Enemy {
+    constructor(x, y, game) {
+        super(x, y);
+        this.radius = 20;
+        this.game = game;
+        this.timer = 0;
+        this.hasExploded = false;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.timer++;
+        // 一定時間経過で針を飛ばす
+        if (!this.hasExploded && this.timer > 120 && this.x < this.game.width - 50) {
+            this.explode();
+            this.hasExploded = true;
+        }
+    }
+    explode() {
+        // 8方向に針を発射
+        for(let i=0; i<8; i++) {
+            const angle = (Math.PI * 2 / 8) * i;
+            this.game.enemies.push(new Needle(this.x, this.y, Math.cos(angle)*4, Math.sin(angle)*4));
+        }
+    }
+    draw(ctx) {
+        const grad = ctx.createRadialGradient(this.x - 5, this.y - 5, 2, this.x, this.y, 20);
+        grad.addColorStop(0, '#E6E6FA');
+        grad.addColorStop(1, '#9370DB'); // MediumPurple
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        // 膨らむ演出
+        const r = this.hasExploded ? 25 : 20 + Math.sin(this.timer * 0.2) * 2;
+        
+        // 体（少し四角っぽくして魚らしく）
+        if (!this.hasExploded) {
+            ctx.ellipse(this.x, this.y, r + 5, r, 0, 0, Math.PI*2);
+        } else {
+            ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        
+        // 目（愛嬌のある感じ）
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 5, 5, 0, Math.PI * 2);
+        ctx.arc(this.x + 8, this.y - 5, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 5, 2, 0, Math.PI * 2);
+        ctx.arc(this.x + 8, this.y - 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 口
+        ctx.strokeStyle = '#4B0082';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 5, 3, 0, Math.PI, false);
+        ctx.stroke();
+
+        // ヒレ
+        ctx.fillStyle = '#9370DB';
+        ctx.beginPath();
+        ctx.ellipse(this.x - 15, this.y + 10, 6, 3, Math.PI/4, 0, Math.PI*2);
+        ctx.ellipse(this.x + 15, this.y + 10, 6, 3, -Math.PI/4, 0, Math.PI*2);
+        ctx.fill();
+
+        // トゲ（通常時も少し出す）
+        ctx.strokeStyle = '#8B008B';
+        ctx.lineWidth = 2;
+        const spikeLen = this.hasExploded ? 25 : 5;
+        for(let i=0; i<8; i++) {
+            const angle = (Math.PI * 2 / 8) * i + (this.timer * 0.05);
+            ctx.moveTo(this.x + Math.cos(angle)*r, this.y + Math.sin(angle)*r);
+            ctx.lineTo(this.x + Math.cos(angle)*(r+spikeLen), this.y + Math.sin(angle)*(r+spikeLen));
+        }
+        ctx.stroke();
+    }
+}
+
+class Needle extends Enemy {
+    constructor(x, y, vx, vy) {
+        super(x, y);
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = 5;
+    }
+    update(speed) {
+        this.x += this.vx; // 画面スクロールの影響を受けない（相対速度ではない）
+        this.x -= speed;   // スクロール分も引く
+        this.y += this.vy;
+    }
+    draw(ctx) {
+        ctx.strokeStyle = '#696969';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x - this.vx * 3, this.y - this.vy * 3);
+        ctx.stroke();
+    }
+}
+
+class Whirlpool extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 35;
+        this.angle = 0;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.angle += 0.2;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // 渦巻き
+        ctx.strokeStyle = 'rgba(224, 255, 255, 0.8)'; // LightCyan
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) { // 3本の腕
+            const offset = (Math.PI * 2 / 3) * i;
+            for (let j = 0; j < 20; j++) {
+                const r = j * 1.5;
+                const a = offset + j * 0.3;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (j===0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+        }
+        ctx.stroke();
+        
+        // 中心
+        ctx.fillStyle = 'rgba(0, 0, 139, 0.5)'; // DarkBlue
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Whale extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 80;
+        this.timer = 0;
     }
     update(speed) {
         // ボスはゆっくり迫ってくる
-        this.x -= speed * 0.5;
-        // 上下に少し揺れる
-        this.y += Math.sin(Date.now() / 500) * 2;
+        this.x -= speed * 0.8; // さらに速く
+        this.y += Math.sin(this.timer += 0.02) * 0.5;
     }
-    draw(ctx) {
-        // ボスのデザイン強化
-        ctx.fillStyle = '#483D8B'; // DarkSlateBlue
-        ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 100, 60, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 模様
-        ctx.strokeStyle = '#8A2BE2';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 50, 0, Math.PI * 2);
-        ctx.stroke();
+    isOffScreen(w, h) { return this.x < -500; }
 
-        // 怖い目
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        ctx.arc(this.x - 40, this.y - 20, 10, 0, Math.PI * 2);
-        ctx.fill();
-        // 瞳孔
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.fillRect(this.x - 42, this.y - 25, 4, 10);
+    draw(ctx) {
+        if (!isFinite(this.x) || !isFinite(this.y)) return;
+
+        // かっこいいクジラ（マッコウクジラ風）
+        const grad = ctx.createLinearGradient(this.x - 150, this.y - 50, this.x + 100, this.y + 50);
+        grad.addColorStop(0, '#191970'); // MidnightBlue (背景と差別化)
+        grad.addColorStop(1, '#483D8B'); // DarkSlateBlue
+        ctx.fillStyle = grad;
         
-        // 牙
+        // 体
+        ctx.beginPath();
+        // 頭部（四角く大きく）
+        ctx.moveTo(this.x + 80, this.y - 40);
+        ctx.lineTo(this.x - 100, this.y - 50);
+        // 背中から尾へ
+        ctx.quadraticCurveTo(this.x + 200, this.y - 40, this.x + 300, this.y);
+        // 尾から腹へ
+        ctx.quadraticCurveTo(this.x + 200, this.y + 40, this.x - 80, this.y + 50);
+        // 下顎
+        ctx.lineTo(this.x + 60, this.y + 40);
+        ctx.quadraticCurveTo(this.x + 80, this.y + 20, this.x + 80, this.y - 40);
+        ctx.fill();
+
+        // 腹の白い部分
+        ctx.fillStyle = '#D3D3D3';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 80, this.y + 50);
+        ctx.quadraticCurveTo(this.x + 100, this.y + 40, this.x + 200, this.y + 10);
+        ctx.quadraticCurveTo(this.x + 100, this.y + 20, this.x - 60, this.y + 30);
+        ctx.fill();
+
+        // 胸ビレ
+        ctx.fillStyle = '#191970';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 20, this.y + 20);
+        ctx.quadraticCurveTo(this.x - 40, this.y + 50, this.x - 10, this.y + 40);
+        ctx.fill();
+
+        // 尾びれ
+        ctx.beginPath();
+        ctx.moveTo(this.x + 300, this.y);
+        ctx.lineTo(this.x + 350, this.y - 30);
+        ctx.lineTo(this.x + 350, this.y + 30);
+        ctx.fill();
+
+        // 目
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.moveTo(this.x - 60, this.y + 20);
-        ctx.lineTo(this.x - 50, this.y + 40);
-        ctx.lineTo(this.x - 40, this.y + 20);
+        ctx.arc(this.x - 40, this.y + 10, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 41, this.y + 10, 2, 0, Math.PI * 2);
         ctx.fill();
     }
 }
 
 class Pearl {
-    constructor(x, y) {
+    constructor(x, y, vx = 0, vy = 0) {
         this.x = x;
         this.y = y;
+        this.vx = vx;
+        this.vy = vy;
         this.radius = 15;
     }
-    update(speed) {
+    update(speed, game) {
         this.x -= speed;
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        this.vx *= 0.95; // 摩擦
+        this.vy *= 0.95;
+
+        if (game) {
+            const floorY = game.getGroundY(this.x) - 15; // 半径分引く
+            if (this.y < floorY) {
+                this.vy += 0.2; // 重力
+            } else if (this.y > floorY) {
+                this.y = floorY;
+                this.vy = -this.vy * 0.6; // バウンド
+                if(Math.abs(this.vy) < 1) this.vy = 0;
+            }
+        }
     }
     isOffScreen() { return this.x < -50; }
     checkCollision(player) {
@@ -1250,31 +2348,52 @@ class Pearl {
         // 貝殻
         ctx.fillStyle = '#FFB6C1'; // LightPink
         ctx.beginPath();
-        ctx.arc(this.x, this.y + 5, 15, Math.PI, 0);
+        ctx.arc(this.x, this.y + 10, 15, Math.PI, 0);
+        ctx.lineTo(this.x, this.y + 20); // 蝶番
         ctx.fill();
+        
+        // 貝殻の筋
+        ctx.strokeStyle = '#FF69B4';
+        ctx.lineWidth = 1;
+        for(let i=1; i<5; i++) {
+            const angle = Math.PI + (Math.PI / 5) * i;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y + 15);
+            ctx.lineTo(this.x + Math.cos(angle)*15, this.y + 10 + Math.sin(angle)*15);
+            ctx.stroke();
+        }
+
         // 真珠
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y + 5, 7, 0, Math.PI * 2);
         ctx.fill();
         // 真珠の輝き
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.shadowBlur = 10;
         ctx.shadowColor = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 2, this.y + 3, 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
     }
 }
 
 class Plankton {
-    constructor(x, y) {
+    constructor(x, y, vx = 0, vy = 0) {
         this.x = x;
         this.y = y;
+        this.vx = vx;
+        this.vy = vy;
         this.radius = 8;
         this.angle = Math.random() * Math.PI * 2;
     }
     update(speed) {
         this.x -= speed;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vx *= 0.95;
+        this.vy *= 0.95;
         this.y += Math.sin(this.angle += 0.1) * 0.5; // ふわふわ
     }
     isOffScreen() { return this.x < -50; }
@@ -1284,10 +2403,34 @@ class Plankton {
         return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
     }
     draw(ctx) {
-        ctx.fillStyle = '#90EE90'; // LightGreen
+        // プランクトン（微生物風デザイン）
+        ctx.fillStyle = 'rgba(152, 251, 152, 0.4)'; // PaleGreen, translucent
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+        // 少し歪んだ円
+        const r = this.radius;
+        ctx.moveTo(this.x + r, this.y);
+        for(let i=1; i<=8; i++) {
+            const angle = i * Math.PI / 4;
+            const dist = r + Math.sin(Date.now() / 200 + i * 2) * 2;
+            ctx.lineTo(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist);
+        }
+        ctx.closePath();
         ctx.fill();
+
+        // 核
+        ctx.fillStyle = '#32CD32'; // LimeGreen
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 内部の粒
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        for(let i=0; i<3; i++) {
+            ctx.beginPath();
+            ctx.arc(this.x + (Math.random()-0.5)*6, this.y + (Math.random()-0.5)*6, 1, 0, Math.PI*2);
+            ctx.fill();
+        }
+
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#90EE90';
         ctx.fill();
@@ -1306,15 +2449,32 @@ class FriendShrimp extends Plankton {
         ctx.translate(this.x, this.y);
         ctx.fillStyle = '#FFB6C1'; // LightPink
         
-        // 簡易的なエビの形
+        // 体
         ctx.beginPath();
         ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
         ctx.fill();
-        // 尻尾
+        
+        // 節
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.beginPath();
-        ctx.moveTo(-8, 0);
-        ctx.lineTo(-14, 4);
-        ctx.lineTo(-14, -4);
+        ctx.arc(-3, -2, 3, 0, Math.PI, false);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(3, -2, 3, 0, Math.PI, false);
+        ctx.fill();
+
+        // 尻尾
+        ctx.fillStyle = '#FFB6C1';
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(-16, 5);
+        ctx.lineTo(-16, -5);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(8, -2, 1.5, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.restore();
@@ -1325,14 +2485,14 @@ class Seaweed {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.height = Math.random() * 40 + 30;
+        this.height = Math.random() * 100 + 80; // 大きくする
         this.swayOffset = Math.random() * Math.PI * 2;
     }
     update(speed) { this.x -= speed; }
     draw(ctx, frameCount) {
-        const sway = Math.sin(frameCount * 0.05 + this.swayOffset) * 10;
+        const sway = Math.sin(frameCount * 0.05 + this.swayOffset) * 20;
         ctx.strokeStyle = '#2E8B57'; // SeaGreen
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 10; // 太くする
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.quadraticCurveTo(this.x + sway, this.y - this.height / 2, this.x + sway * 0.5, this.y - this.height);
@@ -1340,23 +2500,243 @@ class Seaweed {
     }
 }
 
-class Bubble {
+class Rock {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.size = Math.random() * 5 + 2;
-        this.life = 1.0;
+        this.width = Math.random() * 100 + 60; // 大きくする
+        this.height = Math.random() * 60 + 30;
+        this.color = ['#808080', '#696969', '#A9A9A9'][Math.floor(Math.random() * 3)];
     }
-    update(speed) {
-        this.x -= speed * 0.5;
-        this.y -= 1;
-        this.life -= 0.02;
+    update(speed, game) { 
+        this.x -= speed;
+        if (game) this.y = game.getGroundY(this.x);
     }
     draw(ctx) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${this.life})`;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        // 岩の形状を少し複雑に
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + this.width * 0.2, this.y - this.height);
+        ctx.lineTo(this.x + this.width * 0.5, this.y - this.height * 0.8);
+        ctx.lineTo(this.x + this.width * 0.8, this.y - this.height * 1.2);
+        ctx.lineTo(this.x + this.width, this.y);
+        ctx.fill();
+        // 背景として馴染ませるために半透明のオーバーレイ
+        ctx.fillStyle = 'rgba(0, 20, 40, 0.3)';
+        ctx.fill();
+    }
+    
+    checkCollision(player) {
+        // 簡易矩形判定
+        const left = this.x;
+        const right = this.x + this.width;
+        const top = this.y - this.height;
+        const bottom = this.y;
+        
+        const pLeft = player.x - player.radius;
+        const pRight = player.x + player.radius;
+        const pTop = player.y - player.radius;
+        const pBottom = player.y + player.radius;
+
+        return (pRight > left && pLeft < right && pBottom > top && pTop < bottom);
+    }
+}
+
+class Coral {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.color = ['#CD5C5C', '#B22222', '#8B4513'][Math.floor(Math.random() * 3)];
+        this.branches = [];
+        // 枝分かれしたサンゴ
+        for(let i=0; i<8; i++) {
+            const h = Math.random() * 50 + 30;
+            const angle = (Math.random() - 0.5) * 1.0; // 傾き
+            this.branches.push({
+                x: (Math.random() - 0.5) * 40,
+                h: h,
+                w: Math.random() * 8 + 4,
+                angle: angle
+            });
+        }
+    }
+    update(speed) { this.x -= speed; }
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        this.branches.forEach(b => {
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(this.x + b.x, this.y);
+            ctx.rotate(b.angle);
+            ctx.roundRect(-b.w/2, -b.h, b.w, b.h, b.w/2);
+            ctx.fill();
+            ctx.restore();
+        });
+        // 背景として馴染ませる
+        ctx.fillStyle = 'rgba(0, 20, 40, 0.2)';
+        this.branches.forEach(b => {
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(this.x + b.x, this.y);
+            ctx.rotate(b.angle);
+            ctx.roundRect(-b.w/2, -b.h, b.w, b.h, b.w/2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+}
+
+class Clownfish {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 12;
+        this.angle = 0;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.y += Math.sin(this.angle += 0.1) * 0.5;
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // カクレクマノミ（オレンジに白帯）
+        ctx.fillStyle = '#FF4500'; // OrangeRed
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 15, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 白帯
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.fillRect(this.x - 5, this.y - 7, 3, 14);
+        ctx.fillRect(this.x + 3, this.y - 6, 3, 12);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 2, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class GardenEel {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.height = 30;
+    }
+    update(speed) {
+        this.x -= speed;
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = (this.y - 15) - player.y; // 当たり判定は頭付近
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // チンアナゴ（白に黒点）
+        ctx.fillStyle = '#F0F8FF'; // AliceBlue
+        ctx.beginPath();
+        ctx.roundRect(this.x - 4, this.y - this.height, 8, this.height, 4);
+        ctx.fill();
+        
+        // 黒点
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - 20, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - 10, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 2, this.y - 26, 1, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Bubble {
+    constructor(x, y, isBackground = false) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 5 + 2;
+        this.isBackground = isBackground;
+        
+        if (isBackground) {
+            this.life = Math.random() * 0.5 + 0.1; // 背景用は薄く
+            this.decay = 0.002 + Math.random() * 0.003; // 長持ち
+            this.vy = Math.random() * 1.5 + 0.5; // 上昇速度
+            this.vxFactor = 0.1; // スクロール影響少なめ（遠景感）
+        } else {
+            this.life = 1.0;
+            this.decay = 0.02;
+            this.vy = 1;
+            this.vxFactor = 0.5;
+        }
+    }
+    update(speed) {
+        this.x -= speed * this.vxFactor;
+        this.y -= this.vy;
+        this.life -= this.decay;
+    }
+    draw(ctx) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, this.life)})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
+    }
+}
+
+class StreamLine {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.length = Math.random() * 100 + 50;
+    }
+    update(speed) {
+        this.x -= speed;
+    }
+    draw(ctx) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + this.length, this.y);
+        ctx.stroke();
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+        this.vy = -1.5;
+    }
+    update() {
+        this.y += this.vy;
+        this.life -= 0.02;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 24px "M PLUS Rounded 1c", sans-serif';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
     }
 }
 

@@ -447,10 +447,14 @@ class Game {
         this.btnShare.addEventListener('click', (e) => {
             e.stopPropagation();
             const text = `えびちゃん（仮）で${Math.floor(this.score)}m泳ぎました！\n死因: ${this.deathReason}\n難易度: ${this.difficulty}`;
-            const url = 'https://umaumax.github.io/ebi-game/';
+            const baseUrl = 'https://umaumax.github.io/ebi-game/';
             const hashtags = 'えびちゃんゲーム';
-            // シンプルなIntent共有に変更
-            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${encodeURIComponent(hashtags)}`;
+
+            // OGP画像を動的に生成するためのURLを作成
+            const ogpParams = `score=${Math.floor(this.score)}&rank=${encodeURIComponent(this.getRank(this.score))}&reason=${encodeURIComponent(this.deathReason)}`;
+            // このURLはVercel等のサーバーレス関数を想定しています
+            const ogpImageUrl = `https://your-serverless-function-url/api/ogp?${ogpParams}`;
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(baseUrl)}&hashtags=${encodeURIComponent(hashtags)}`;
             window.open(twitterUrl, '_blank');
         });
 
@@ -590,9 +594,9 @@ class Game {
     startReplay() {
         this.state = STATE.REPLAY;
         this.screenGameOver.style.display = 'none';
-        this.uiReplay.style.display = 'block';
-        this.replayIndex = 0;
-        // リプレイバッファの先頭から再生
+        this.uiReplay.style.display = 'block'; 
+        // 最後の3秒間だけ再生 (30fps * 3s = 90フレーム)
+        this.replayIndex = Math.max(0, this.replayBuffer.length - 90);
     }
 
     updateLifeDisplay() {
@@ -684,6 +688,12 @@ class Game {
             this.btnReplay.style.display = 'none';
         }
 
+        // 衝突地点を記録
+        const collisionPoint = this.replayBuffer.length > 0 ? this.replayBuffer[this.replayBuffer.length - 1].player : null;
+        if (collisionPoint) {
+            collisionPoint.collided = true;
+        }
+
         // 移動経路マップの描画
         const mapCanvas = document.getElementById('mapCanvas');
         const mapCtx = mapCanvas.getContext('2d');
@@ -703,6 +713,7 @@ class Game {
 
             mapCtx.strokeStyle = '#FF6F61';
             mapCtx.lineWidth = 2;
+            mapCtx.setLineDash([5, 3]); // 点線にする
             mapCtx.beginPath();
             path.forEach((p, i) => {
                 const x = 10 + (p.x - minX) * scaleX;
@@ -714,6 +725,19 @@ class Game {
                 }
             });
             mapCtx.stroke();
+            mapCtx.setLineDash([]); // 点線をリセット
+
+            // 衝突地点にX印を描画
+            if (collisionPoint && collisionPoint.collided) {
+                const x = 10 + (collisionPoint.x - minX) * scaleX;
+                const y = 10 + (collisionPoint.y - minY) * scaleY;
+                mapCtx.strokeStyle = '#FF0000';
+                mapCtx.lineWidth = 3;
+                mapCtx.beginPath();
+                mapCtx.moveTo(x - 5, y - 5); mapCtx.lineTo(x + 5, y + 5);
+                mapCtx.moveTo(x + 5, y - 5); mapCtx.lineTo(x - 5, y + 5);
+                mapCtx.stroke();
+            }
         }
 
         if (this.score > this.highScore) {
@@ -859,7 +883,7 @@ class Game {
     }
 
     recordState() {
-        // 2フレームに1回記録（メモリ節約）
+        // 2フレームに1回記録
         if (this.frameCount % 2 !== 0) return;
 
         const snapshot = {
@@ -870,7 +894,8 @@ class Game {
             },
             scrollOffset: this.scrollOffset,
             score: this.score,
-            objects: []
+            objects: [],
+            decorations: [] // 岩の判定用に別途保存
         };
 
         // 描画に必要なオブジェクトの状態を保存
@@ -897,9 +922,10 @@ class Game {
         this.enemies.forEach(saveObj);
         this.particles.forEach(saveObj);
         this.streamLines.forEach(saveObj);
+        snapshot.decorations = this.decorations.map(d => ({ type: d.constructor.name, x: d.x, y: d.y, width: d.width, height: d.height }));
 
         this.replayBuffer.push(snapshot);
-        // バッファ制限（約10秒分 = 60fps/2 * 10 = 300フレーム）
+        // バッファ制限（約10秒分 = 30fps * 10s = 300フレーム）
         if (this.replayBuffer.length > 300) {
             this.replayBuffer.shift();
         }
@@ -1274,23 +1300,27 @@ class Game {
         // 仲間エビの描画（履歴から復元）
         // リプレイバッファ自体を履歴として使う
         const followerCount = Math.max(0, pData.lives - 1);
+        const replayDecorations = snapshot.decorations.map(d => {
+            const dummy = this.replayDummies[d.type];
+            Object.assign(dummy, d);
+            return dummy;
+        });
+
         for (let i = 1; i <= followerCount; i++) {
             // 2フレームに1回記録しているので、遅延フレーム数(8) / 2 = 4インデックス前を参照
             const delayIdx = i * 4;
             const prevSnapshot = this.replayBuffer[this.replayIndex - delayIdx];
             if (prevSnapshot) {
-                Object.assign(pDummy, prevSnapshot.player);
-                // 仲間描画用の特別なモードがあればいいが、ここでは簡易的に位置だけ合わせて描画
-                // 本来のShrimp.drawロジックを再利用するのは少し複雑なので、メインのdrawと同じロジックをここで再現
-                // ...簡略化のため、プレイヤー本体のみ描画するか、あるいはShrimpクラスに仲間描画ロジックを分離するのが理想
+                const followerDummy = { ...prevSnapshot.player, radius: pDummy.radius * 0.7 };
+                const inRock = replayDecorations.some(d => d instanceof Rock && d.checkCollision(followerDummy));
+                if (inRock) continue;
+
+                pDummy.drawFollower(this.ctx, prevSnapshot.player);
             }
         }
         // 本体描画
         Object.assign(pDummy, pData); // 戻す
-        // リプレイでは仲間エビの描画を正確に再現するのが難しいため、本体のみ描画（またはlives=1として描画）
-        // ここではlivesを渡して、Shrimp.draw内で履歴(this.history)を使うが、ダミーには履歴がない。
-        // 履歴がないと仲間は描画されないので、違和感はあるが許容する。
-        pDummy.draw(this.ctx, 1); 
+        pDummy.drawBody(this.ctx, pData.isBending);
 
         // UI
         this.ctx.fillStyle = 'white';
@@ -1479,6 +1509,23 @@ class Shrimp {
         
         this.drawBody(ctx, this.isBending);
 
+        ctx.restore();
+    }
+
+    drawFollower(ctx, pos) {
+        if (!isFinite(pos.x) || !isFinite(pos.y)) return;
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(pos.angle);
+        // 仲間は少し小さく、色を変える
+        const scale = 0.7;
+        ctx.scale(scale, scale);
+        // 仲間の色
+        const fGrad = ctx.createRadialGradient(0, -this.radius*0.2, 0, 0, 0, this.radius);
+        fGrad.addColorStop(0, '#FFC0CB');
+        fGrad.addColorStop(1, '#FFB6C1');
+        ctx.fillStyle = fGrad;
+        this.drawBody(ctx, pos.isBending);
         ctx.restore();
     }
 

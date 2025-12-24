@@ -6,6 +6,11 @@
     <title>えびちゃん（仮）</title>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦐</text></svg>">
+    <meta property="og:title" content="えびちゃん（仮）">
+    <meta property="og:description" content="迫りくる天敵を避けながらどれだけ長く泳げるかを競うシンプル回避アクションゲーム">
+    <meta property="og:image" content="https://umaumax.github.io/ebi-game/ebi-game-screenshot.png">
+    <meta property="og:url" content="https://umaumax.github.io/ebi-game/">
+    <meta name="twitter:card" content="summary_large_image">
     <style>
         body {
             margin: 0;
@@ -221,6 +226,7 @@
 
     <div id="pause-screen" class="message-box" style="display: none;">
         <h1>PAUSED</h1>
+        <button id="download-ss-btn" class="diff-btn" style="background-color: #00BCD4; margin-top: 10px;">スクリーンショットを保存</button>
         <div class="blink">TAP TO RESUME</div>
     </div>
 
@@ -440,6 +446,17 @@ class Game {
         // スキップボタン
         const skipReplayHandler = (e) => { e.stopPropagation(); this.gameOver(this.deathReason); };
         ['mousedown', 'touchstart'].forEach(evt => this.btnSkipReplay.addEventListener(evt, skipReplayHandler));
+
+        // スクショダウンロードボタン
+        this.btnDownloadSS = document.getElementById('download-ss-btn');
+        const downloadSSHandler = (e) => {
+            e.stopPropagation();
+            const link = document.createElement('a');
+            link.download = `ebi-game-screenshot-${Date.now()}.png`;
+            link.href = this.canvas.toDataURL('image/png');
+            link.click();
+        };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnDownloadSS.addEventListener(evt, downloadSSHandler));
 
         // シェアボタン
         this.btnShare = document.getElementById('share-btn');

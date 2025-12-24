@@ -211,7 +211,6 @@
     <div id="gameover-screen" class="message-box" style="display: none;">
         <h1>GAME OVER</h1>
         <img id="screenshot" style="width: 100%; max-width: 400px; height: auto; border-radius: 10px; margin: 10px auto; border: 2px solid #333; display: block;">
-        <canvas id="mapCanvas" style="width: 100%; max-width: 400px; height: 100px; border-radius: 10px; margin: -114px auto 14px; border: 2px solid #333; display: block; background: rgba(0,0,0,0.5);"></canvas>
         <p>記録: <span id="final-score">0</span>m</p>
         <p id="rank-display" style="font-size: 20px; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px black; margin: 5px 0;"></p>
         <p style="color: #FF4500; font-weight: bold;">死因: <span id="death-reason">不明</span></p>
@@ -516,6 +515,9 @@ class Game {
             if (this.state === STATE.START) {
                 // スペースキーでもNORMALで開始できるようにする
                 if (e.type === 'keydown' && e.code === 'Space') {
+                    this.btnNormal.style.transform = 'scale(1.1)';
+                    this.btnNormal.style.boxShadow = '0 0 15px #2196F3';
+                    setTimeout(() => { this.btnNormal.style.transform = ''; this.btnNormal.style.boxShadow = ''; }, 200);
                     this.startGame('NORMAL');
                 }
             } else if (this.state === STATE.PLAYING) {
@@ -686,58 +688,6 @@ class Game {
             this.btnReplay.style.display = 'block';
         } else {
             this.btnReplay.style.display = 'none';
-        }
-
-        // 衝突地点を記録
-        const collisionPoint = this.replayBuffer.length > 0 ? this.replayBuffer[this.replayBuffer.length - 1].player : null;
-        if (collisionPoint) {
-            collisionPoint.collided = true;
-        }
-
-        // 移動経路マップの描画
-        const mapCanvas = document.getElementById('mapCanvas');
-        const mapCtx = mapCanvas.getContext('2d');
-        mapCanvas.width = 400;
-        mapCanvas.height = 100;
-        mapCtx.clearRect(0, 0, 400, 100);
-
-        if (this.replayBuffer.length > 0) {
-            const path = this.replayBuffer.map(s => s.player);
-            const minX = Math.min(...path.map(p => p.x));
-            const maxX = Math.max(...path.map(p => p.x));
-            const minY = 0; // 常に水面から
-            const maxY = this.height; // 地面まで
-
-            const scaleX = 380 / (maxX - minX || 1);
-            const scaleY = 80 / (maxY - minY || 1);
-
-            mapCtx.strokeStyle = '#FF6F61';
-            mapCtx.lineWidth = 2;
-            mapCtx.setLineDash([5, 3]); // 点線にする
-            mapCtx.beginPath();
-            path.forEach((p, i) => {
-                const x = 10 + (p.x - minX) * scaleX;
-                const y = 10 + (p.y - minY) * scaleY;
-                if (i === 0) {
-                    mapCtx.moveTo(x, y);
-                } else {
-                    mapCtx.lineTo(x, y);
-                }
-            });
-            mapCtx.stroke();
-            mapCtx.setLineDash([]); // 点線をリセット
-
-            // 衝突地点にX印を描画
-            if (collisionPoint && collisionPoint.collided) {
-                const x = 10 + (collisionPoint.x - minX) * scaleX;
-                const y = 10 + (collisionPoint.y - minY) * scaleY;
-                mapCtx.strokeStyle = '#FF0000';
-                mapCtx.lineWidth = 3;
-                mapCtx.beginPath();
-                mapCtx.moveTo(x - 5, y - 5); mapCtx.lineTo(x + 5, y + 5);
-                mapCtx.moveTo(x + 5, y - 5); mapCtx.lineTo(x - 5, y + 5);
-                mapCtx.stroke();
-            }
         }
 
         if (this.score > this.highScore) {
@@ -1115,15 +1065,17 @@ class Game {
 
             // 岩の当たり判定
             if (deco instanceof Rock) {
-                const pBottom = this.player.y + this.player.radius;
-                const rockTop = deco.y - deco.height;
-
-                // 上に乗っているかどうかの判定
-                const isOnTop = pBottom > rockTop && pBottom < rockTop + 15 &&
-                                this.player.x > deco.x && this.player.x < deco.x + deco.width;
-
-                if (isOnTop) {
-                    // 上に乗っている場合は何もしない（Shrimp.updateで処理）
+                // プレイヤーが岩の水平範囲内にいるか
+                if (this.player.x > deco.x && this.player.x < deco.x + deco.width) {
+                    const rockTopY = deco.y - deco.height;
+                    // プレイヤーが岩の上付近にいて、かつ岩が現在の地面より高い場合
+                    if (this.player.y + this.player.radius > rockTopY - 10 && rockTopY < this.getGroundY(this.player.x)) {
+                        // ここでは何もしない（Shrimp.updateで地面として処理される）
+                    } else if (deco.checkCollision(this.player)) {
+                        // 横からぶつかった場合
+                        this.player.x = deco.x - this.player.radius;
+                        if (this.player.vx > 0) this.player.vx = 0;
+                    }
                 }
                 // 横からぶつかった場合
                 else if (deco.checkCollision(this.player)) {
@@ -1230,8 +1182,10 @@ class Game {
         this.ctx.lineTo(this.width, this.height);
         this.ctx.fill();
 
-        // 装飾描画（背景扱い）
-        this.decorations.forEach(d => d.draw(this.ctx, this.frameCount));
+        // 装飾描画（岩は砂の奥）
+        this.decorations.filter(d => d instanceof Rock).forEach(d => d.draw(this.ctx, this.frameCount));
+        this.ctx.fill(); // 砂を再描画して岩を部分的に隠す
+        this.decorations.filter(d => !(d instanceof Rock)).forEach(d => d.draw(this.ctx, this.frameCount));
 
         // 激流エフェクト描画
         this.streamLines.forEach(l => l.draw(this.ctx));
@@ -1300,27 +1254,16 @@ class Game {
         // 仲間エビの描画（履歴から復元）
         // リプレイバッファ自体を履歴として使う
         const followerCount = Math.max(0, pData.lives - 1);
-        const replayDecorations = snapshot.decorations.map(d => {
-            const dummy = this.replayDummies[d.type];
-            Object.assign(dummy, d);
-            return dummy;
-        });
 
         for (let i = 1; i <= followerCount; i++) {
             // 2フレームに1回記録しているので、遅延フレーム数(8) / 2 = 4インデックス前を参照
             const delayIdx = i * 4;
             const prevSnapshot = this.replayBuffer[this.replayIndex - delayIdx];
-            if (prevSnapshot) {
-                const followerDummy = { ...prevSnapshot.player, radius: pDummy.radius * 0.7 };
-                const inRock = replayDecorations.some(d => d instanceof Rock && d.checkCollision(followerDummy));
-                if (inRock) continue;
-
-                pDummy.drawFollower(this.ctx, prevSnapshot.player);
-            }
+            if (prevSnapshot) pDummy.drawFollower(this.ctx, prevSnapshot.player);
         }
         // 本体描画
         Object.assign(pDummy, pData); // 戻す
-        pDummy.drawBody(this.ctx, pData.isBending);
+        pDummy.draw(this.ctx, pData.lives, snapshot.decorations.map(d => Object.assign(this.replayDummies[d.type], d)));
 
         // UI
         this.ctx.fillStyle = 'white';
@@ -1401,7 +1344,7 @@ class Shrimp {
         // 地面（海底・岩）との当たり判定
         let groundY = game.getGroundY(this.x);
         // 岩の上に乗る判定
-        for (const deco of game.decorations) {
+        for (const deco of game.decorations.filter(d => d instanceof Rock)) {
             if (deco instanceof Rock) {
                 // プレイヤーが岩の水平範囲内にいるか
                 if (this.x > deco.x && this.x < deco.x + deco.width) {
@@ -1693,11 +1636,13 @@ class Fish extends Enemy {
 class Sardine extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 10;
+        this.radius = 12;
         this.speed = 2.0; // 少し速い
+        this.angle = Math.random() * Math.PI * 2;
     }
     update(baseSpeed) {
         this.x -= (baseSpeed + this.speed);
+        this.y += Math.sin(this.angle += 0.1) * 0.5;
     }
     draw(ctx) {
         const grad = ctx.createLinearGradient(this.x, this.y - 6, this.x, this.y + 6);
@@ -1913,7 +1858,12 @@ class Hook extends Enemy {
 class Net extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 60; // 大きく
+        this.radius = 80; // 大きく
+        this.angle = 0;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.y += Math.sin(this.angle += 0.02) * 1;
     }
     draw(ctx) {
         if (!isFinite(this.x) || !isFinite(this.y)) return;
@@ -1937,7 +1887,7 @@ class Net extends Enemy {
         }
 
         // 網袋
-        ctx.fillStyle = 'rgba(139, 69, 19, 0.1)';
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.1)';
         ctx.beginPath();
         ctx.moveTo(this.x - 60, this.y - 70);
         ctx.bezierCurveTo(this.x - 70, this.y, this.x - 30, this.y + 70, this.x, this.y + 80);
@@ -2257,34 +2207,28 @@ class Whirlpool extends Enemy {
         this.angle += 0.2;
     }
     draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        
-        // 渦巻き
+        // ソフトクリームのような渦潮
         ctx.strokeStyle = 'rgba(224, 255, 255, 0.8)'; // LightCyan
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) { // 3本の腕
-            const offset = (Math.PI * 2 / 3) * i;
-            for (let j = 0; j < 20; j++) {
-                const r = j * 1.5;
-                const a = offset + j * 0.3;
-                const px = Math.cos(a) * r;
-                const py = Math.sin(a) * r;
-                if (j===0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
-            }
+        
+        const segments = 50;
+        for (let i = 0; i < segments; i++) {
+            const ratio = i / segments;
+            const radius = (1 - ratio) * this.radius;
+            const angle = this.angle + i * 0.5;
+            const x = this.x + Math.cos(angle) * radius;
+            const y = this.y + Math.sin(angle) * radius;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
         }
         ctx.stroke();
         
         // 中心
         ctx.fillStyle = 'rgba(0, 0, 139, 0.5)'; // DarkBlue
         ctx.beginPath();
-        ctx.arc(0, 0, 5, 0, Math.PI*2);
+        ctx.arc(this.x, this.y, 5, 0, Math.PI*2);
         ctx.fill();
-
-        ctx.restore();
     }
 }
 
@@ -2568,9 +2512,6 @@ class Rock {
         ctx.lineTo(this.x + this.width * 0.5, this.y - this.height * 0.8);
         ctx.lineTo(this.x + this.width * 0.8, this.y - this.height * 1.2);
         ctx.lineTo(this.x + this.width, this.y);
-        ctx.fill();
-        // 背景として馴染ませるために半透明のオーバーレイ
-        ctx.fillStyle = 'rgba(0, 20, 40, 0.3)';
         ctx.fill();
     }
     

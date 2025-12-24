@@ -67,6 +67,8 @@
             border-radius: 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             pointer-events: auto; /* ボタンなどを押せるように */
+            position: relative; /* z-indexを効かせるため */
+            z-index: 1000; /* ライフ表示より手前に */
         }
         h1 {
             margin: 0 0 10px 0;
@@ -595,8 +597,13 @@ class Game {
                 if (e.type === 'keydown' && e.code === 'Space') {
                     this.btnNormal.style.transform = 'scale(1.1)';
                     this.btnNormal.style.boxShadow = '0 0 15px #2196F3';
-                    setTimeout(() => { this.btnNormal.style.transform = ''; this.btnNormal.style.boxShadow = ''; }, 200);
-                    this.startGame('NORMAL');
+                    this.btnNormal.style.transition = 'all 0.1s';
+                    // エフェクトを見せるために少し遅延させる
+                    setTimeout(() => { 
+                        this.btnNormal.style.transform = ''; 
+                        this.btnNormal.style.boxShadow = ''; 
+                        this.startGame('NORMAL');
+                    }, 200);
                 }
             } else if (this.state === STATE.PLAYING) {
                 this.player.jump();
@@ -1446,6 +1453,30 @@ class Game {
         // プレイヤー描画
         this.player.draw(this.ctx, this.lives, this.decorations);
 
+        // 深海モード（暗闇演出）
+        // スコア500mから徐々に暗くなり、プレイヤーの周りだけ明るくする
+        if (this.score > 500) {
+            const darknessStart = 500;
+            const darknessEnd = 3000;
+            const maxDarkness = 0.95;
+            const ratio = Math.min(Math.max((this.score - darknessStart) / (darknessEnd - darknessStart), 0), 1);
+            const darknessAlpha = ratio * maxDarkness;
+
+            if (darknessAlpha > 0.01) {
+                const cx = this.player.x;
+                const cy = this.player.y;
+                const lightRadius = 150; // 明るい範囲
+                const fadeRadius = lightRadius + 400; // グラデーションの広がり
+
+                const grad = this.ctx.createRadialGradient(cx, cy, lightRadius, cx, cy, fadeRadius);
+                grad.addColorStop(0, 'rgba(0, 0, 20, 0)');
+                grad.addColorStop(1, `rgba(0, 0, 20, ${darknessAlpha})`);
+
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+            }
+        }
+
         // 捕獲中のUI描画
         if (this.state === STATE.CAUGHT || (this.state === STATE.GAMEOVER && this.caughtNet)) {
             // プレイヤーの上に網を描画して「捕まっている感」を出す
@@ -1562,6 +1593,29 @@ class Game {
         Object.assign(pDummy, pData); // 戻す
         pDummy.draw(this.ctx, pData.lives, snapshot.decorations.map(d => Object.assign(this.replayDummies[d.type], d)));
 
+        // 深海モード（リプレイ）
+        if (snapshot.score > 500) {
+            const darknessStart = 500;
+            const darknessEnd = 3000;
+            const maxDarkness = 0.95;
+            const ratio = Math.min(Math.max((snapshot.score - darknessStart) / (darknessEnd - darknessStart), 0), 1);
+            const darknessAlpha = ratio * maxDarkness;
+
+            if (darknessAlpha > 0.01) {
+                const cx = snapshot.player.x;
+                const cy = snapshot.player.y;
+                const lightRadius = 150;
+                const fadeRadius = lightRadius + 400;
+
+                const grad = this.ctx.createRadialGradient(cx, cy, lightRadius, cx, cy, fadeRadius);
+                grad.addColorStop(0, 'rgba(0, 0, 20, 0)');
+                grad.addColorStop(1, `rgba(0, 0, 20, ${darknessAlpha})`);
+
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+            }
+        }
+
         // UI
         this.ctx.fillStyle = 'white';
         this.ctx.font = '20px sans-serif';
@@ -1595,6 +1649,8 @@ class Shrimp {
         this.bendTimer = 0;
         this.history = []; // 軌跡保存用
         this.recoveryBoostTimer = 0;
+        this.isOnGround = false;
+        this.walkTimer = 0;
     }
 
     jump() {
@@ -1615,6 +1671,7 @@ class Shrimp {
 
         // 重力（徐々に沈む）
         this.vy += CONSTANTS.GRAVITY;
+        this.isOnGround = false;
 
         if (this.recoveryBoostTimer > 0) this.recoveryBoostTimer--;
         const recoveryForce = (this.recoveryBoostTimer > 0) ? 0.35 : 0.2;
@@ -1681,6 +1738,7 @@ class Shrimp {
         if (this.y > groundY - this.radius) { // 地面に着地
             this.y = groundY - this.radius;
             this.vy = 0;
+            this.isOnGround = true;
         }
         
         // 右壁
@@ -1691,6 +1749,12 @@ class Shrimp {
             this.bendTimer--;
         } else {
             this.isBending = false;
+        }
+
+        if (this.isOnGround) {
+            this.walkTimer += 0.5;
+        } else {
+            this.walkTimer = 0;
         }
 
         // NaNガード
@@ -1832,8 +1896,9 @@ class Shrimp {
             for(let i=0; i<4; i++) {
                 ctx.beginPath();
                 const x = -this.radius * 0.5 + i * this.radius * 0.4;
+                const legOffset = this.isOnGround ? Math.sin(this.walkTimer + i * 2) * 4 : 0;
                 ctx.moveTo(x, this.radius * 0.3);
-                ctx.lineTo(x - 2, this.radius * 0.8);
+                ctx.lineTo(x - 2 + legOffset, this.radius * 0.8);
                 ctx.stroke();
             }
 
@@ -2928,7 +2993,7 @@ class Whirlpool extends Enemy {
 class Whale extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 120; // 大きく
+        this.radius = 150; // さらに大きく
         this.timer = 0;
         this.attackTimer = 0;
     }
@@ -2959,14 +3024,14 @@ class Whale extends Enemy {
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        const scale = 1.6; // さらに巨大化
+        const scale = 2.0; // もっと巨大化
         ctx.scale(scale, scale);
 
         // マッコウクジラ風
-        // 色: 背景（深海）と同化しないよう、少し明るめのグレーに変更
+        // 色: 背景（深海）と同化しないよう、かなり明るいグレーに変更
         const grad = ctx.createLinearGradient(-150, -50, 100, 50);
-        grad.addColorStop(0, '#90A4AE'); // BlueGray Light
-        grad.addColorStop(1, '#546E7A'); // BlueGray Medium
+        grad.addColorStop(0, '#E0E0E0'); // Light Gray
+        grad.addColorStop(1, '#78909C'); // Blue Gray
         ctx.fillStyle = grad;
         
         // 体

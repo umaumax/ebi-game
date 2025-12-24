@@ -387,6 +387,8 @@ class Game {
         this.scrollOffset = 0;
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
+        this.rapidCurrentY = 0;
+        this.rapidCurrentHeight = 0;
         this.streamLines = []; // 激流のエフェクト
         this.replayBuffer = []; // リプレイ用データ
         this.replayIndex = 0;
@@ -591,6 +593,8 @@ class Game {
         this.scrollOffset = 0;
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
+        this.rapidCurrentY = 0;
+        this.rapidCurrentHeight = 0;
         this.streamLines = [];
         this.replayBuffer = [];
         this.sound.startBGM();
@@ -810,7 +814,13 @@ class Game {
                     this.items.push(new GardenEel(this.width + 20, groundY));
                 }
             } else if (rand < 0.85) { // 岩の確率を少し上げる
-                this.decorations.push(new Rock(this.width, groundY));
+                if (Math.random() < 0.2) { // たまに連続岩ゾーン
+                    for(let i=0; i<5; i++) {
+                        this.decorations.push(new Rock(this.width + i * 120, groundY, true));
+                    }
+                } else {
+                    this.decorations.push(new Rock(this.width, groundY));
+                }
             } else {
                 this.decorations.push(new Coral(this.width, groundY));
                 // サンゴ礁にカクレクマノミ
@@ -1082,14 +1092,21 @@ class Game {
 
             // 岩の当たり判定
             if (deco instanceof Rock) {
-                // プレイヤーが岩の水平範囲内にいるか
-                if (this.player.x > deco.x && this.player.x < deco.x + deco.width) {
-                    const rockTopY = deco.y - deco.height;
-                    // プレイヤーが岩の上付近にいて、かつ岩が現在の地面より高い場合
-                    if (this.player.y + this.player.radius > rockTopY - 10 && rockTopY < this.getGroundY(this.player.x)) {
-                        // ここでは何もしない（Shrimp.updateで地面として処理される）
-                    } else if (deco.checkCollision(this.player)) {
-                        // 横からぶつかった場合
+                if (deco.isContinuous) {
+                    // 連続岩は地面として扱う
+                    if (this.player.y + this.player.radius > deco.y - deco.height) {
+                        this.player.y = deco.y - deco.height - this.player.radius;
+                        this.player.vy = 0;
+                    }
+                }
+                // 横からぶつかった場合
+                else if (deco.checkCollision(this.player)) {
+                    const pBottom = this.player.y + this.player.radius;
+                    const rockTop = deco.y - deco.height;
+                    if (pBottom < rockTop + 20) { // 上に乗る
+                        this.player.y = rockTop - this.player.radius;
+                        this.player.vy = 0;
+                    } else {
                         this.player.x = deco.x - this.player.radius;
                         if (this.player.vx > 0) this.player.vx = 0;
                     }
@@ -1105,7 +1122,9 @@ class Game {
 
         // 激流エフェクト（ストリームライン）
         if (this.isRapidCurrent && this.frameCount % 5 === 0) {
-            this.streamLines.push(new StreamLine(this.width, Math.random() * this.height));
+            for (let i = 0; i < 3; i++) {
+                this.streamLines.push(new StreamLine(this.width, this.rapidCurrentY + Math.random() * this.rapidCurrentHeight));
+            }
         }
         for (let i = this.streamLines.length - 1; i >= 0; i--) {
             // 激流時はスクロールも速く見えるように
@@ -1360,18 +1379,11 @@ class Shrimp {
         
         // 地面（海底・岩）との当たり判定
         let groundY = game.getGroundY(this.x);
-        // 岩の上に乗る判定
-        for (const deco of game.decorations.filter(d => d instanceof Rock)) {
-            if (deco instanceof Rock) {
-                // プレイヤーが岩の水平範囲内にいるか
-                if (this.x > deco.x && this.x < deco.x + deco.width) {
-                    const rockTopY = deco.y - deco.height;
-                    // プレイヤーが岩の上付近にいて、かつ岩が現在の地面より高い場合
-                    if (this.y + this.radius > rockTopY - 10 && rockTopY < groundY) {
-                         groundY = rockTopY;
-                    }
-                }
-            }
+        // 連続岩ゾーンの上に乗る
+        const continuousRock = game.decorations.find(d => d instanceof Rock && d.isContinuous && this.x > d.x && this.x < d.x + d.width);
+        if (continuousRock) {
+            const rockTopY = continuousRock.y - continuousRock.height;
+            if (rockTopY < groundY) groundY = rockTopY;
         }
         if (this.y > groundY - this.radius) { // 地面に着地
             this.y = groundY - this.radius;
@@ -1875,11 +1887,11 @@ class Hook extends Enemy {
 class Net extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 80; // 大きく
+        this.radius = 120; // 大きく
         this.angle = 0;
     }
     update(speed) {
-        this.x -= speed;
+        this.x -= speed * 0.8; // 少し遅く
         this.y += Math.sin(this.angle += 0.02) * 1;
     }
     draw(ctx) {
@@ -2509,12 +2521,13 @@ class Seaweed {
 }
 
 class Rock {
-    constructor(x, y) {
+    constructor(x, y, isContinuous = false) {
         this.x = x;
         this.y = y;
-        this.width = Math.random() * 100 + 60; // 大きくする
-        this.height = Math.random() * 60 + 30;
+        this.width = isContinuous ? 121 : Math.random() * 100 + 60; // 連続岩は幅を固定
+        this.height = Math.random() * 80 + 40;
         this.color = ['#808080', '#696969', '#A9A9A9'][Math.floor(Math.random() * 3)];
+        this.isContinuous = isContinuous;
     }
     update(speed, game) { 
         this.x -= speed;

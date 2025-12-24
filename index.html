@@ -220,6 +220,7 @@
         <p id="rank-display" style="font-size: 20px; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px black; margin: 5px 0;"></p>
         <p style="color: #FF4500; font-weight: bold;">死因: <span id="death-reason">不明</span></p>
         <div class="blink">TAP TO RETRY</div>
+        <button id="gameover-download-ss-btn" class="diff-btn" style="background-color: #00BCD4; margin-top: 10px; display: block; margin-left: auto; margin-right: auto;">スクリーンショットを保存</button>
         <button id="replay-btn" style="margin-top: 10px; padding: 10px 20px; background-color: #FF8C00; color: white; border: none; border-radius: 20px; font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: bold; cursor: pointer; font-size: 14px; display: block; margin-left: auto; margin-right: auto;">🎥 ダイジェスト再生</button>
         <button id="share-btn" style="margin-top: 15px; padding: 10px 20px; background-color: #000; color: white; border: none; border-radius: 20px; font-family: 'M PLUS Rounded 1c', sans-serif; font-weight: bold; cursor: pointer; font-size: 14px;">Xでシェア</button>
     </div>
@@ -387,8 +388,6 @@ class Game {
         this.scrollOffset = 0;
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
-        this.rapidCurrentY = 0;
-        this.rapidCurrentHeight = 0;
         this.streamLines = []; // 激流のエフェクト
         this.replayBuffer = []; // リプレイ用データ
         this.replayIndex = 0;
@@ -417,6 +416,8 @@ class Game {
         this.screenStart = document.getElementById('start-screen');
         this.screenGameOver = document.getElementById('gameover-screen');
         this.screenPause = document.getElementById('pause-screen');
+
+        this.screenshotTaken = false;
 
         // UI for replay
         this.uiReplay = document.getElementById('replay-ui');
@@ -460,6 +461,17 @@ class Game {
         };
         ['mousedown', 'touchstart'].forEach(evt => this.btnDownloadSS.addEventListener(evt, downloadSSHandler));
 
+        // ゲームオーバー画面のスクショダウンロードボタン
+        this.btnGameoverDownloadSS = document.getElementById('gameover-download-ss-btn');
+        const gameoverDownloadSSHandler = (e) => {
+            e.stopPropagation();
+            const link = document.createElement('a');
+            link.download = `ebi-game-result-${Date.now()}.png`;
+            link.href = this.gameOverScreenshotURL || this.canvas.toDataURL('image/png');
+            link.click();
+        };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnGameoverDownloadSS.addEventListener(evt, gameoverDownloadSSHandler));
+
         // シェアボタン
         this.btnShare = document.getElementById('share-btn');
         this.btnShare.addEventListener('click', (e) => {
@@ -492,7 +504,7 @@ class Game {
             Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, 
             SeaUrchin, Octopus, Porcupinefish, Needle, Whirlpool, Whale,
             Pearl, Plankton, FriendShrimp, Clownfish, GardenEel,
-            Seaweed, Rock, Coral, StreamLine, Bubble
+            Seaweed, RuggedTerrain, Coral, StreamLine, Bubble
         ];
         classes.forEach(cls => {
             try {
@@ -593,9 +605,8 @@ class Game {
         this.scrollOffset = 0;
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
-        this.rapidCurrentY = 0;
-        this.rapidCurrentHeight = 0;
         this.streamLines = [];
+        this.screenshotTaken = false;
         this.replayBuffer = [];
         this.sound.startBGM();
         this.enemies = [];
@@ -694,6 +705,39 @@ class Game {
         this.state = STATE.GAMEOVER;
         this.screenGameOver.style.display = 'block';
         
+        // ゲームオーバーUIを描画した状態のCanvasを保存
+        if (!this.screenshotTaken) {
+            this.ctx.save();
+            
+            // 背景を少し暗くする
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+
+            // GAME OVER
+            this.ctx.fillStyle = '#FF4500';
+            this.ctx.font = 'bold 48px "M PLUS Rounded 1c"';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.shadowColor = 'white';
+            this.ctx.shadowBlur = 10;
+            this.ctx.fillText("GAME OVER", this.width / 2, this.height / 2 - 80);
+            this.ctx.shadowBlur = 0;
+
+            // 記録 (Score)
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 32px "M PLUS Rounded 1c"';
+            this.ctx.fillText(`記録: ${Math.floor(this.score)}m`, this.width / 2, this.height / 2);
+
+            // 称号 (Rank)
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+            this.ctx.fillText(`称号: ${this.getRank(this.score)}`, this.width / 2, this.height / 2 + 40);
+
+            this.ctx.restore();
+            this.gameOverScreenshotURL = this.canvas.toDataURL('image/png');
+            this.screenshotTaken = true;
+        }
+
         // スクリーンショット生成
         const dataUrl = this.canvas.toDataURL();
         document.getElementById('screenshot').src = dataUrl;
@@ -814,13 +858,7 @@ class Game {
                     this.items.push(new GardenEel(this.width + 20, groundY));
                 }
             } else if (rand < 0.85) { // 岩の確率を少し上げる
-                if (Math.random() < 0.2) { // たまに連続岩ゾーン
-                    for(let i=0; i<5; i++) {
-                        this.decorations.push(new Rock(this.width + i * 120, groundY, true));
-                    }
-                } else {
-                    this.decorations.push(new Rock(this.width, groundY));
-                }
+                this.decorations.push(new RuggedTerrain(this.width, this.height));
             } else {
                 this.decorations.push(new Coral(this.width, groundY));
                 // サンゴ礁にカクレクマノミ
@@ -1090,41 +1128,21 @@ class Game {
             // 画面外判定修正: 岩などが完全に消えてから削除
             if (deco.x < -200) this.decorations.splice(i, 1);
 
-            // 岩の当たり判定
-            if (deco instanceof Rock) {
-                if (deco.isContinuous) {
-                    // 連続岩は地面として扱う
-                    if (this.player.y + this.player.radius > deco.y - deco.height) {
-                        this.player.y = deco.y - deco.height - this.player.radius;
-                        this.player.vy = 0;
-                    }
-                }
-                // 横からぶつかった場合
-                else if (deco.checkCollision(this.player)) {
-                    const pBottom = this.player.y + this.player.radius;
-                    const rockTop = deco.y - deco.height;
-                    if (pBottom < rockTop + 20) { // 上に乗る
-                        this.player.y = rockTop - this.player.radius;
-                        this.player.vy = 0;
-                    } else {
-                        this.player.x = deco.x - this.player.radius;
-                        if (this.player.vx > 0) this.player.vx = 0;
-                    }
-                }
-                // 横からぶつかった場合
-                else if (deco.checkCollision(this.player)) {
-                    // 岩の左側に押し出す
-                    this.player.x = deco.x - this.player.radius;
-                    if (this.player.vx > 0) this.player.vx = 0;
+            // 新しい岩（地形）の当たり判定
+            if (deco instanceof RuggedTerrain) {
+                // プレイヤーの中心が岩の最高点より下の場合のみ、横からの衝突を判定
+                // これにより、上から乗ろうとしたときに押し出されるのを防ぐ
+                const highestPoint = Math.min(...deco.points.map(p => p.y));
+                if (this.player.y > highestPoint && deco.checkSideCollision(this.player)) {
+                     this.player.x = deco.x - this.player.radius;
+                     if (this.player.vx > 0) this.player.vx = 0;
                 }
             }
         }
 
         // 激流エフェクト（ストリームライン）
         if (this.isRapidCurrent && this.frameCount % 5 === 0) {
-            for (let i = 0; i < 3; i++) {
-                this.streamLines.push(new StreamLine(this.width, this.rapidCurrentY + Math.random() * this.rapidCurrentHeight));
-            }
+            this.streamLines.push(new StreamLine(this.width, Math.random() * this.height));
         }
         for (let i = this.streamLines.length - 1; i >= 0; i--) {
             // 激流時はスクロールも速く見えるように
@@ -1218,11 +1236,6 @@ class Game {
         this.ctx.lineTo(this.width, this.height);
         this.ctx.fill();
 
-        // 装飾描画（岩は砂の奥）
-        this.decorations.filter(d => d instanceof Rock).forEach(d => d.draw(this.ctx, this.frameCount));
-        this.ctx.fill(); // 砂を再描画して岩を部分的に隠す
-        this.decorations.filter(d => !(d instanceof Rock)).forEach(d => d.draw(this.ctx, this.frameCount));
-
         // 激流エフェクト描画
         this.streamLines.forEach(l => l.draw(this.ctx));
 
@@ -1237,6 +1250,9 @@ class Game {
 
         // 敵描画
         this.enemies.forEach(e => e.draw(this.ctx));
+
+        // 装飾描画
+        this.decorations.forEach(d => d.draw(this.ctx, this.frameCount));
 
         // プレイヤー描画
         this.player.draw(this.ctx, this.lives, this.decorations);
@@ -1379,11 +1395,19 @@ class Shrimp {
         
         // 地面（海底・岩）との当たり判定
         let groundY = game.getGroundY(this.x);
-        // 連続岩ゾーンの上に乗る
-        const continuousRock = game.decorations.find(d => d instanceof Rock && d.isContinuous && this.x > d.x && this.x < d.x + d.width);
-        if (continuousRock) {
-            const rockTopY = continuousRock.y - continuousRock.height;
-            if (rockTopY < groundY) groundY = rockTopY;
+        for (const deco of game.decorations.filter(d => d instanceof RuggedTerrain)) {
+            if (this.x > deco.x && this.x < deco.x + deco.width) {
+                // プレイヤーの真下の岩の表面Y座標を取得
+                const rockSurfaceY = deco.getSurfaceY(this.x);
+                if (rockSurfaceY < groundY) {
+                    groundY = rockSurfaceY;
+                }
+            }
+            // 横からの衝突判定
+            else if (deco.checkSideCollision(this)) {
+                this.x = deco.x - this.radius;
+                if (this.vx > 0) this.vx = 0;
+            }
         }
         if (this.y > groundY - this.radius) { // 地面に着地
             this.y = groundY - this.radius;
@@ -1445,7 +1469,7 @@ class Shrimp {
                 const followerDummy = { x: pos.x, y: pos.y, radius: this.radius * 0.7 };
                 let inRock = false;
                 if (decorations) {
-                    inRock = decorations.some(d => d instanceof Rock && d.checkCollision(followerDummy));
+                    inRock = decorations.some(d => d instanceof RuggedTerrain && d.checkSideCollision(followerDummy));
                 }
 
                 if (inRock) continue;
@@ -1887,11 +1911,11 @@ class Hook extends Enemy {
 class Net extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 120; // 大きく
+        this.radius = 80; // 大きく
         this.angle = 0;
     }
     update(speed) {
-        this.x -= speed * 0.8; // 少し遅く
+        this.x -= speed;
         this.y += Math.sin(this.angle += 0.02) * 1;
     }
     draw(ctx) {
@@ -2153,7 +2177,7 @@ class Porcupinefish extends Enemy {
         grad.addColorStop(1, '#9370DB'); // MediumPurple
         ctx.fillStyle = grad;
         ctx.beginPath();
-        // 膨らむ演出
+        
         const r = this.hasExploded ? 25 : 20 + Math.sin(this.timer * 0.2) * 2;
         
         // 体（少し四角っぽくして魚らしく）
@@ -2167,27 +2191,33 @@ class Porcupinefish extends Enemy {
         // 目（愛嬌のある感じ）
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(this.x - 8, this.y - 5, 5, 0, Math.PI * 2);
-        ctx.arc(this.x + 8, this.y - 5, 5, 0, Math.PI * 2);
+        ctx.arc(this.x - 8, this.y - 5, 6, 0, Math.PI * 2);
+        ctx.arc(this.x + 8, this.y - 5, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 8, this.y - 5, 2, 0, Math.PI * 2);
-        ctx.arc(this.x + 8, this.y - 5, 2, 0, Math.PI * 2);
+        ctx.arc(this.x - 7, this.y - 5, 2.5, 0, Math.PI * 2);
+        ctx.arc(this.x + 9, this.y - 5, 2.5, 0, Math.PI * 2);
         ctx.fill();
 
         // 口
         ctx.strokeStyle = '#4B0082';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(this.x, this.y + 5, 3, 0, Math.PI, false);
+        ctx.arc(this.x, this.y + 6, 4, 0, Math.PI, false);
         ctx.stroke();
 
         // ヒレ
         ctx.fillStyle = '#9370DB';
         ctx.beginPath();
-        ctx.ellipse(this.x - 15, this.y + 10, 6, 3, Math.PI/4, 0, Math.PI*2);
-        ctx.ellipse(this.x + 15, this.y + 10, 6, 3, -Math.PI/4, 0, Math.PI*2);
+        ctx.moveTo(this.x - 15, this.y + 5);
+        ctx.lineTo(this.x - 25, this.y + 15);
+        ctx.lineTo(this.x - 15, this.y + 15);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(this.x + 15, this.y + 5);
+        ctx.lineTo(this.x + 25, this.y + 15);
+        ctx.lineTo(this.x + 15, this.y + 15);
         ctx.fill();
 
         // トゲ（通常時も少し出す）
@@ -2520,44 +2550,76 @@ class Seaweed {
     }
 }
 
-class Rock {
-    constructor(x, y, isContinuous = false) {
+class RuggedTerrain {
+    constructor(x, y) {
         this.x = x;
-        this.y = y;
-        this.width = isContinuous ? 121 : Math.random() * 100 + 60; // 連続岩は幅を固定
-        this.height = Math.random() * 80 + 40;
-        this.color = ['#808080', '#696969', '#A9A9A9'][Math.floor(Math.random() * 3)];
-        this.isContinuous = isContinuous;
+        this.y = y; // 画面の高さ
+        this.width = Math.random() * 300 + 200; // 幅を大きく
+        this.baseHeight = Math.random() * 150 + 80; // 高さを大きく
+        this.points = [];
+        const segments = 10;
+        for (let i = 0; i <= segments; i++) {
+            const px = this.x + (i / segments) * this.width;
+            // 頂点をよりギザギザに
+            const py = this.y - this.baseHeight - (Math.random() - 0.5) * 60;
+            this.points.push({x: px, y: py});
+        }
     }
     update(speed, game) { 
         this.x -= speed;
-        if (game) this.y = game.getGroundY(this.x);
+        this.points.forEach(p => p.x -= speed);
+        // 砂のうねりに合わせる必要はないので、yの更新は削除
     }
     draw(ctx) {
-        ctx.fillStyle = this.color;
+        const grad = ctx.createLinearGradient(this.x, this.y - this.baseHeight, this.x, this.y);
+        grad.addColorStop(0, '#505050');
+        grad.addColorStop(1, '#303030');
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        // 岩の形状を少し複雑に
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + this.width * 0.2, this.y - this.height);
-        ctx.lineTo(this.x + this.width * 0.5, this.y - this.height * 0.8);
-        ctx.lineTo(this.x + this.width * 0.8, this.y - this.height * 1.2);
-        ctx.lineTo(this.x + this.width, this.y);
+        ctx.moveTo(this.points[0].x, this.y);
+        this.points.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.lineTo(this.points[this.points.length - 1].x, this.y);
         ctx.fill();
+
+        // ハイライトとシャドウで立体感を出す
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.points[0].x, this.points[0].y);
+        for(let i=1; i<this.points.length; i++) {
+            ctx.lineTo(this.points[i].x, this.points[i].y);
+        }
+        ctx.stroke();
     }
     
-    checkCollision(player) {
-        // 簡易矩形判定
-        const left = this.x;
-        const right = this.x + this.width;
-        const top = this.y - this.height;
-        const bottom = this.y;
-        
-        const pLeft = player.x - player.radius;
-        const pRight = player.x + player.radius;
-        const pTop = player.y - player.radius;
-        const pBottom = player.y + player.radius;
+    getSurfaceY(x) {
+        for (let i = 0; i < this.points.length - 1; i++) {
+            const p1 = this.points[i];
+            const p2 = this.points[i+1];
+            if (x >= p1.x && x <= p2.x && p1.x !== p2.x) {
+                const ratio = (x - p1.x) / (p2.x - p1.x);
+                return p1.y + (p2.y - p1.y) * ratio;
+            }
+        }
+        return this.y; // 範囲外なら地面の高さ
+    }
 
-        return (pRight > left && pLeft < right && pBottom > top && pTop < bottom);
+    checkSideCollision(player) {
+        // 左側面との衝突判定（プレイヤーが岩の左側にいる場合のみ）
+        if (player.x > this.points[0].x) return false;
+
+        const leftEdgeTop = this.points[0];
+        const leftEdgeBottom = {x: this.points[0].x, y: this.y};
+        const dist = this.distToSegment(player, leftEdgeTop, leftEdgeBottom);
+        return dist < player.radius;
+    }
+
+    distToSegment(p, v, w) {
+        const l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
+        if (l2 === 0) return Math.sqrt((p.x - v.x)**2 + (p.y - v.y)**2);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2);
     }
 }
 

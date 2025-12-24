@@ -103,6 +103,35 @@
         @media (max-width: 600px) {
             h1 { font-size: 24px; }
             p { font-size: 14px; }
+            
+            /* UI調整 */
+            .score-display {
+                font-size: 14px;
+                top: 15px;
+                left: 10px;
+                padding: 5px 8px;
+            }
+            .level-display {
+                font-size: 14px;
+                top: 15px;
+                right: 50px; /* ポーズボタンの左 */
+                padding: 5px 8px;
+            }
+            #pause-btn {
+                width: 35px;
+                height: 35px;
+                top: 12px;
+                right: 10px;
+                font-size: 14px;
+            }
+            .life-display {
+                font-size: 20px;
+                top: 15px;
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                white-space: nowrap;
+            }
         }
         .life-display {
             position: absolute;
@@ -184,11 +213,92 @@
             color: white;
             font-size: 16px;
         }
+        .achievement-notification {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #fff;
+            padding: 10px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 2px solid #FFF;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .achievement-notification.show {
+            top: 80px;
+        }
+        .badge-list {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .badge {
+            width: 40px;
+            height: 40px;
+            background: #FFD700;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            border: 2px solid #DAA520;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .badge.locked {
+            background: #e0e0e0;
+            border-color: #bdbdbd;
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+        .badge:hover::after, .badge:active::after {
+            content: attr(data-title);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 100;
+            pointer-events: none;
+            white-space: pre-wrap; /* 改行対応 */
+            text-align: center;
+        }
+        .settings-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        .settings-group label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #555;
+        }
     </style>
 </head>
 <body>
 
 <div id="ui-layer">
+    <div id="achievement-notification" class="achievement-notification">
+        <span>🏆</span> <span id="achievement-text">実績解除！</span>
+    </div>
+
     <div class="score-display">
         DISTANCE: <span id="score">0</span>m<br>
         <span style="font-size: 0.6em; color: #eee;">HI: <span id="high-score">0</span>m</span>
@@ -205,7 +315,7 @@
     <div id="warning-msg" class="warning-msg">WARNING!</div>
 
     <div id="start-screen" class="message-box">
-        <h1>えびちゃん（仮）</h1>
+        <h1>えびちゃん<span id="title-kari" style="cursor: pointer; color: #FF4500;">（仮）</span></h1>
         <p>泳ぐ：タップ / スペース</p>
         <p>難易度を選んでスタート</p>
         <div class="difficulty-select">
@@ -220,6 +330,7 @@
         <img id="screenshot" style="width: 100%; max-width: 400px; height: auto; border-radius: 10px; margin: 10px auto; border: 2px solid #333; display: block;">
         <p>記録: <span id="final-score">0</span>m</p>
         <p id="rank-display" style="font-size: 20px; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 2px black; margin: 5px 0;"></p>
+        <div id="badge-container" class="badge-list"></div>
         <p style="color: #FF4500; font-weight: bold;">死因: <span id="death-reason">不明</span></p>
         <div class="blink">TAP TO RETRY</div>
         <button id="gameover-download-ss-btn" class="diff-btn" style="background-color: #00BCD4; margin-top: 10px; display: block; margin-left: auto; margin-right: auto;">スクリーンショットを保存</button>
@@ -229,8 +340,15 @@
 
     <div id="pause-screen" class="message-box" style="display: none;">
         <h1>PAUSED</h1>
-        <button id="download-ss-btn" class="diff-btn" style="background-color: #00BCD4; margin-top: 10px;">スクリーンショットを保存</button>
-        <div class="blink">TAP TO RESUME</div>
+        <div class="settings-group">
+            <label>BGM <input type="range" id="bgm-slider" min="0" max="1" step="0.1"></label>
+        </div>
+        <div class="settings-group">
+            <label>SE <input type="range" id="se-slider" min="0" max="1" step="0.1"></label>
+        </div>
+        <button id="resume-btn" class="diff-btn" style="background-color: #2196F3; margin-top: 10px; width: 100%;">再開</button>
+        <button id="retry-btn" class="diff-btn" style="background-color: #FF9800; margin-top: 10px; width: 100%;">最初からやり直す</button>
+        <button id="title-btn" class="diff-btn" style="background-color: #757575; margin-top: 10px; width: 100%;">タイトルへ戻る</button>
     </div>
 
     <div id="replay-ui" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: auto; display: none;">
@@ -279,6 +397,8 @@ class SoundManager {
         this.bgmStep = 0;
         this.bgmTempo = 250;
         this.bgmPitchRate = 1.0;
+        this.bgmVolume = 0.3;
+        this.seVolume = 0.5;
     }
 
     init() {
@@ -287,12 +407,16 @@ class SoundManager {
         }
     }
 
-    playTone(freq, type, duration, vol = 0.1) {
+    playTone(freq, type, duration, vol = 0.1, isBGM = false) {
+        const masterVol = isBGM ? this.bgmVolume : this.seVolume;
+        const finalVol = vol * masterVol;
+        if (finalVol <= 0.001) return;
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.setValueAtTime(finalVol, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
@@ -305,7 +429,7 @@ class SoundManager {
         const gain = this.ctx.createGain();
         osc.frequency.setValueAtTime(300, this.ctx.currentTime);
         osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.1 * this.seVolume, this.ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
@@ -319,7 +443,7 @@ class SoundManager {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(150, this.ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.2 * this.seVolume, this.ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
@@ -354,7 +478,7 @@ class SoundManager {
         filter.frequency.value = 400; // こもらせる
 
         const gain = this.ctx.createGain();
-        gain.gain.value = vol;
+        gain.gain.value = vol * this.seVolume;
         noise.connect(filter);
         filter.connect(gain);
         gain.connect(this.ctx.destination);
@@ -386,7 +510,7 @@ class SoundManager {
         if (this.ctx.state !== 'suspended') {
             const baseFreq = notes[this.bgmStep % notes.length];
             if (baseFreq > 0) {
-                this.playTone(baseFreq * this.bgmPitchRate, 'triangle', 0.2, 0.03);
+                this.playTone(baseFreq * this.bgmPitchRate, 'triangle', 0.2, 0.1, true);
             }
         }
         this.bgmStep++;
@@ -410,6 +534,7 @@ class Game {
         this.canvas.width = this.width;
         this.canvas.height = this.height;
 
+        this.scaleFactor = 1.0; // 画面サイズによるスケール係数
         this.state = STATE.START;
         this.score = 0;
         this.highScore = parseInt(localStorage.getItem('ebi_highscore')) || 0;
@@ -431,6 +556,8 @@ class Game {
         this.caughtNet = null; // 捕まっている網
         this.escapeClicks = 0; // 脱出連打数
         this.requiredClicks = 5; // 脱出に必要な連打数
+        this.damageTaken = false; // ダメージを受けたか（実績用）
+        this.currentRank = ""; // 現在のランク
         this.sound = new SoundManager();
 
         this.player = new Shrimp(this.width / 3, this.height / 2);
@@ -455,6 +582,15 @@ class Game {
         this.screenStart = document.getElementById('start-screen');
         this.screenGameOver = document.getElementById('gameover-screen');
         this.screenPause = document.getElementById('pause-screen');
+        this.uiAchievement = document.getElementById('achievement-notification');
+        this.uiAchievementText = document.getElementById('achievement-text');
+        this.uiBadgeContainer = document.getElementById('badge-container');
+        this.uiTitleKari = document.getElementById('title-kari');
+        
+        // ポーズ画面UI
+        this.uiBgmSlider = document.getElementById('bgm-slider');
+        this.uiSeSlider = document.getElementById('se-slider');
+        this.btnResume = document.getElementById('resume-btn');
 
         this.screenshotTaken = false;
 
@@ -489,16 +625,37 @@ class Game {
         const skipReplayHandler = (e) => { e.stopPropagation(); this.gameOver(this.deathReason); };
         ['mousedown', 'touchstart'].forEach(evt => this.btnSkipReplay.addEventListener(evt, skipReplayHandler));
 
-        // スクショダウンロードボタン
-        this.btnDownloadSS = document.getElementById('download-ss-btn');
-        const downloadSSHandler = (e) => {
+        // タイトル「（仮）」タップで深海手前スタート
+        const kariStartHandler = (e) => {
             e.stopPropagation();
-            const link = document.createElement('a');
-            link.download = `ebi-game-screenshot-${Date.now()}.png`;
-            link.href = this.canvas.toDataURL('image/png');
-            link.click();
+            this.sound.playItem();
+            this.startGame('NORMAL', 1750); // 1800mでクジラが出る直前
         };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnDownloadSS.addEventListener(evt, downloadSSHandler));
+        ['mousedown', 'touchstart'].forEach(evt => this.uiTitleKari.addEventListener(evt, kariStartHandler));
+
+        // ポーズ画面のボタン
+        this.btnResume.addEventListener('click', (e) => { e.stopPropagation(); this.togglePause(); });
+        
+        document.getElementById('retry-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.togglePause(); // ポーズ解除
+            this.startGame(this.difficulty); // リスタート
+        });
+        
+        document.getElementById('title-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.togglePause();
+            this.resetGame();
+        });
+
+        // 音量スライダー
+        this.uiBgmSlider.value = this.sound.bgmVolume;
+        this.uiSeSlider.value = this.sound.seVolume;
+        
+        this.uiBgmSlider.addEventListener('input', (e) => { this.sound.bgmVolume = parseFloat(e.target.value); });
+        this.uiSeSlider.addEventListener('input', (e) => { 
+            this.sound.seVolume = parseFloat(e.target.value);
+        });
 
         // ゲームオーバー画面のスクショダウンロードボタン
         this.btnGameoverDownloadSS = document.getElementById('gameover-download-ss-btn');
@@ -527,6 +684,18 @@ class Game {
             window.open(twitterUrl, '_blank');
         });
 
+        // 実績データの初期化
+        this.achievements = [
+            { id: 'reach_500', title: '冒険の始まり', description: '500m到達', icon: '🚩', condition: (g) => g.score >= 500 },
+            { id: 'reach_1000', title: '深海への到達', description: '1000m到達', icon: '🌊', condition: (g) => g.score >= 1000 },
+            { id: 'reach_2000', title: '深淵の目撃者', description: '2000m到達', icon: '👁️', condition: (g) => g.score >= 2000 },
+            { id: 'no_damage_1000', title: '華麗なる回避', description: 'ノーダメージで1000m到達', icon: '✨', condition: (g) => g.score >= 1000 && !g.damageTaken },
+            { id: 'survive_boss', title: '巨大生物との遭遇', description: 'ボスを回避して生き延びる', icon: '🐋', condition: (g) => g.enemies.some(e => (e instanceof Whale || e instanceof Architeuthis) && e.x < g.player.x) },
+            { id: 'collector', title: 'トレジャーハンター', description: 'アイテムを20個集める', icon: '💎', condition: (g) => g.itemsCollected >= 20 }
+        ];
+        this.unlockedAchievements = JSON.parse(localStorage.getItem('ebi_achievements')) || [];
+        this.itemsCollected = 0;
+
         this.resize();
         window.addEventListener('resize', () => this.resize());
         this.setupInput();
@@ -541,7 +710,7 @@ class Game {
         // クラス名からインスタンスを引けるようにマップを作成
         const classes = [
             Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, 
-            SeaUrchin, Octopus, Porcupinefish, Needle, Whirlpool, Whale, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
+            SeaUrchin, Octopus, Porcupinefish, Needle, Whirlpool, Whale, Architeuthis, GiantTentacle, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
             Pearl, Plankton, FriendShrimp, Clownfish, GardenEel, TreasureChest,
             Shipwreck,
             Seaweed, RuggedTerrain, Coral, StreamLine, Bubble
@@ -552,6 +721,7 @@ class Game {
                 // 一部のクラスは引数が必要だが、描画に使うプロパティは後で上書きするのでエラーにならなければOK
                 if (cls === Shark) this.replayDummies[cls.name] = new cls(0, 0, null);
                 else if (cls === Porcupinefish) this.replayDummies[cls.name] = new cls(0, 0, this);
+                else if (cls === Architeuthis) this.replayDummies[cls.name] = new cls(0, 0, this);
                 else this.replayDummies[cls.name] = new cls(0, 0);
             } catch (e) {
                 console.error("Dummy init failed for", cls.name, e);
@@ -565,6 +735,23 @@ class Game {
         this.height = window.innerHeight;
         this.canvas.width = this.width;
         this.canvas.height = this.height;
+        
+        // 画面サイズに応じたスケール計算
+        // PC基準幅を1000px程度と想定し、スマホ縦(375px)なら0.6倍程度にする
+        const isPortrait = this.height > this.width;
+        const baseWidth = isPortrait ? 600 : 1000;
+        this.scaleFactor = Math.min(1.0, Math.max(0.6, this.width / baseWidth));
+
+        // スクロール速度の再調整（画面幅に合わせて）
+        let baseSpeed = 3.5;
+        if (this.difficulty === 'EASY') baseSpeed = 3.0;
+        else if (this.difficulty === 'HARD') baseSpeed = 5.0;
+        
+        const widthRatio = Math.min(1.0, Math.max(0.6, this.width / 1000));
+        this.scrollSpeed = baseSpeed * widthRatio;
+        if (isPortrait) this.scrollSpeed *= 0.8; // 縦画面は避けにくいのでさらに遅く
+
+        this.updatePlayerSize();
     }
 
     setupInput() {
@@ -573,6 +760,10 @@ class Game {
             
             // ボタン操作時は何もしない（ボタンのハンドラに任せる）
             if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+            // スライダー操作時も何もしない
+            if (e.target.tagName === 'INPUT' && e.target.type === 'range') return;
+            // ラベル操作時も
+            if (e.target.tagName === 'LABEL') return;
 
             // ポーズボタン
             if (e.target === this.uiPauseBtn) {
@@ -617,6 +808,25 @@ class Game {
                 // リプレイ中はタップで終了
                 this.gameOver(this.deathReason);
             }
+
+            // スタート画面での隠し機能（エビタップで深海スタート）
+            if (this.state === STATE.START) {
+                let clientX, clientY;
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                // プレイヤー（エビ）との距離判定
+                const dx = clientX - this.player.x;
+                const dy = clientY - this.player.y;
+                if (Math.sqrt(dx * dx + dy * dy) < this.player.radius * 3) {
+                    this.sound.playItem(); // 音を鳴らす
+                    this.startGame('NORMAL', 2000); // 深海(2000m)からスタート
+                }
+            }
         };
 
         window.addEventListener('keydown', action);
@@ -638,7 +848,7 @@ class Game {
         }
     }
 
-    startGame(difficulty = 'NORMAL') {
+    startGame(difficulty = 'NORMAL', startScore = 0) {
         this.difficulty = difficulty;
         this.state = STATE.PLAYING;
         this.screenStart.style.display = 'none';
@@ -646,14 +856,13 @@ class Game {
         this.score = 0;
         this.lives = 3;
         this.updateLifeDisplay();
-        this.level = 0;
+        this.level = Math.floor(startScore / 100);
         
-        // 難易度による初期速度設定
-        if (this.difficulty === 'EASY') this.scrollSpeed = 3.0;
-        else if (this.difficulty === 'HARD') this.scrollSpeed = 5.0;
-        else this.scrollSpeed = CONSTANTS.SCROLL_SPEED; // 3.0
+        // 初期化時にリサイズ処理を呼んでパラメータを確定させる
+        this.resize();
 
-        this.lastBossDistance = 0;
+        // スタート地点に合わせて前回のボス位置を調整（すぐにボスが出るように）
+        this.lastBossDistance = Math.floor(startScore / CONSTANTS.BOSS_INTERVAL) * CONSTANTS.BOSS_INTERVAL;
         this.uiWarning.classList.remove('active');
         this.frameCount = 0;
         this.scrollOffset = 0;
@@ -665,6 +874,9 @@ class Game {
         this.caughtNet = null;
         this.escapeClicks = 0;
         
+        this.damageTaken = false;
+        this.currentRank = this.getRank(0);
+        this.itemsCollected = 0;
         this.replayBuffer = [];
         this.sound.startBGM();
         this.enemies = [];
@@ -676,6 +888,12 @@ class Game {
         const startX = this.width < 600 ? this.width * 0.15 : this.width / 3;
         this.player.reset(startX, this.height / 2);
         this.updatePlayerSize();
+
+        // 深海スタートの場合
+        if (startScore > 0) {
+            this.score = startScore;
+            this.addFloatingText(this.player.x, this.player.y - 50, "DEEP SEA MODE!", "#FF00FF");
+        }
     }
 
     resetGame() {
@@ -703,7 +921,8 @@ class Game {
         // ライフが増えるとサイズ（当たり判定）が大きくなる仕様
         // ライフ3を基準(20px)とし、増減でサイズ変化
         if (this.player) {
-            const size = CONSTANTS.SHRIMP_BASE_SIZE + (this.lives - 3) * 5;
+            const base = CONSTANTS.SHRIMP_BASE_SIZE * this.scaleFactor;
+            const size = base + (this.lives - 3) * 5 * this.scaleFactor;
             this.player.radius = Math.max(10, size); // 最小10pxは確保
         }
     }
@@ -715,6 +934,7 @@ class Game {
         this.lives--;
         this.updateLifeDisplay();
         this.updatePlayerSize();
+        this.damageTaken = true;
         this.deathReason = reason;
         
         if (this.lives <= 0) {
@@ -783,6 +1003,25 @@ class Game {
         return "深海の覇者";
     }
 
+    showNotification(icon, text) {
+        this.uiAchievementText.innerText = `${icon} ${text}`;
+        this.uiAchievement.classList.add('show');
+        setTimeout(() => this.uiAchievement.classList.remove('show'), 3000);
+        this.sound.playItem();
+    }
+
+    checkAchievements() {
+        this.achievements.forEach(ach => {
+            if (!this.unlockedAchievements.includes(ach.id)) {
+                if (ach.condition(this)) {
+                    this.unlockedAchievements.push(ach.id);
+                    localStorage.setItem('ebi_achievements', JSON.stringify(this.unlockedAchievements));
+                    this.showNotification(ach.icon, ach.title);
+                }
+            }
+        });
+    }
+
     gameOver(reason) {
         if (reason) this.deathReason = reason;
         this.state = STATE.GAMEOVER;
@@ -838,6 +1077,18 @@ class Game {
         this.uiFinalScore.innerText = Math.floor(this.score);
         this.uiRank.innerText = `称号: ${this.getRank(this.score)}`;
         this.uiDeathReason.innerText = reason || this.deathReason;
+
+        // バッジ表示
+        this.uiBadgeContainer.innerHTML = '';
+        this.achievements.forEach(ach => {
+            const badge = document.createElement('div');
+            badge.className = `badge ${this.unlockedAchievements.includes(ach.id) ? '' : 'locked'}`;
+            badge.innerText = ach.icon;
+            badge.title = ach.title; // ツールチップ用
+            // スマホ等でタップした時に名前が見えるようにdata属性もセット
+            badge.setAttribute('data-title', `${ach.title}\n${ach.description}`);
+            this.uiBadgeContainer.appendChild(badge);
+        });
         
         // リプレイボタンの表示制御（データがある場合のみ）
         if (this.replayBuffer.length > 0) {
@@ -856,7 +1107,7 @@ class Game {
 
     spawnEnemy() {
         // ボス出現中は雑魚敵を出さない
-        if (this.uiWarning.classList.contains('active') || this.enemies.some(e => e instanceof Whale)) {
+        if (this.uiWarning.classList.contains('active') || this.enemies.some(e => e instanceof Whale || e instanceof Architeuthis)) {
             return;
         }
 
@@ -875,12 +1126,19 @@ class Game {
             baseRate = 70;
             minRate = 20;
         }
+        
+        // スマホ調整: 画面が狭い場合は出現頻度を少し下げる
+        if (this.width < 600) {
+            baseRate = Math.floor(baseRate * 1.2);
+            minRate = Math.floor(minRate * 1.2);
+        }
 
         const spawnRate = Math.max(minRate, baseRate - Math.floor(this.score / 25));
         
         if (this.frameCount % spawnRate === 0) {
             const type = Math.random();
             const isDeep = this.score > 1000; // 1000m超えたら深海
+            const isVeryDeep = this.score > 2000;
             
             // 岩の上に敵を配置できるかチェック
             // 画面右端付近にある岩を探す
@@ -899,17 +1157,23 @@ class Game {
                 if (Math.random() < 0.5) {
                     this.enemies.push(new SeaAnemone(enemyX, enemyY));
                 } else {
-                    this.enemies.push(new Starfish(enemyX, enemyY));
+                    if (!isDeep) this.enemies.push(new Starfish(enemyX, enemyY));
+                    else this.enemies.push(new SeaUrchin(enemyX, enemyY - 15));
                 }
             } else if (type < 0.20) {
                 // 魚 (20%)
-                this.enemies.push(new Fish(this.width, Math.random() * (this.height - 100) + 50));
+                if (!isDeep) this.enemies.push(new Fish(this.width, Math.random() * (this.height - 100) + 50));
+                else this.enemies.push(new Flatfish(this.width, this.height - 40)); // 深海ではヒラメ
             } else if (type < 0.35) {
                 // イワシの群れ (15%)
-                const baseY = Math.random() * (this.height - 150) + 50;
-                const count = Math.floor(Math.random() * 6) + 10; // 10~15匹
-                for(let i=0; i<count; i++) {
-                    this.enemies.push(new Sardine(this.width + Math.random() * 200, baseY + Math.random()*80 - 40));
+                if (!isDeep) {
+                    const baseY = Math.random() * (this.height - 150) + 50;
+                    const count = Math.floor(Math.random() * 6) + 10; // 10~15匹
+                    for(let i=0; i<count; i++) {
+                        this.enemies.push(new Sardine(this.width + Math.random() * 200, baseY + Math.random()*80 - 40));
+                    }
+                } else {
+                    this.enemies.push(new SeaUrchin(this.width, this.height - 65)); // 深海ではウニ
                 }
             } else if (type < 0.45) {
                 // マグロ (10%) - 直進高速
@@ -917,10 +1181,10 @@ class Game {
             } else if (type < 0.50) {
                 // サメ (5%) - ホーミング
                 this.enemies.push(new Shark(this.width, Math.random() * (this.height - 100) + 50, this.player));
-            } else if (type < 0.60) {
+            } else if (type < 0.60 && !isDeep) {
                 // 網 (10%)
                 this.enemies.push(new Net(this.width + 100, Math.random() * (this.height - 200) + 100));
-            } else if (type < 0.70) {
+            } else if (type < 0.70 && !isDeep) {
                 // 釣り針 (10%)
                 this.enemies.push(new Hook(this.width, -100));
             } else if (type < 0.80) {
@@ -935,7 +1199,7 @@ class Game {
             } else if (type < 0.93) {
                 // ハリセンボン (5%) - 新規
                 this.enemies.push(new Porcupinefish(this.width, Math.random() * (this.height - 100) + 50, this));
-            } else if (type < 0.95) {
+            } else if (type < 0.95 && isDeep) {
                 // 電気ウナギ (2%) - 新規
                 this.enemies.push(new ElectricEel(this.width, Math.random() * (this.height - 100) + 50, this.player));
             } else if (type < 0.97) {
@@ -951,6 +1215,12 @@ class Game {
                 // うに (2%) - 海底に配置
                 this.enemies.push(new SeaUrchin(this.width, this.height - 65));
             }
+
+            // 生成した敵のサイズを画面サイズに合わせて調整
+            const enemy = this.enemies[this.enemies.length - 1];
+            if (enemy) {
+                enemy.radius *= this.scaleFactor;
+            }
         }
     }
 
@@ -963,19 +1233,21 @@ class Game {
 
     spawnDecorations() {
         const groundY = this.getGroundY(this.width);
+        const isDeep = this.score > 1000;
 
         // 海底の装飾 (わかめ、岩、サンゴ)
         if (this.frameCount % 30 === 0) { // 岩ゾーンのために少し頻度を戻す
             const rand = Math.random();
-            if (rand < 0.6) {
+            // 深海ではワカメやサンゴは出ない（岩場メイン）
+            if (rand < 0.6 && !isDeep) {
                 this.decorations.push(new Seaweed(this.width, groundY));
                 // わかめに混じってチンアナゴ
                 if (Math.random() < 0.1) { // 出現率を下げる
                     this.items.push(new GardenEel(this.width + 20, groundY));
                 }
-            } else if (rand < 0.85) { // 岩の確率を少し上げる
+            } else if (rand < 0.85 || isDeep) { // 岩の確率を少し上げる（深海ならほぼ岩）
                 this.decorations.push(new RuggedTerrain(this.width, this.height));
-            } else {
+            } else if (!isDeep) {
                 this.decorations.push(new Coral(this.width, groundY));
                 // サンゴ礁にカクレクマノミ
                 if (Math.random() < 0.5) {
@@ -996,6 +1268,10 @@ class Game {
         if (this.frameCount % 600 === 0) {
             this.items.push(new FriendShrimp(this.width, Math.random() * (this.height - 100) + 50));
         }
+
+        // 生成したアイテムのサイズ調整
+        const item = this.items[this.items.length - 1];
+        if (item) item.radius *= this.scaleFactor;
     }
 
     scatterItems(x, y) {
@@ -1003,13 +1279,17 @@ class Game {
         for(let k=0; k<8; k++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = Math.random() * 6 + 2;
-            this.items.push(new Pearl(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed));
+            const p = new Pearl(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed);
+            p.radius *= this.scaleFactor;
+            this.items.push(p);
         }
         // 大量のプランクトン（ふわふわ広がる）
         for(let k=0; k<15; k++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = Math.random() * 6 + 2;
-            this.items.push(new Plankton(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed));
+            const p = new Plankton(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed);
+            p.radius *= this.scaleFactor;
+            this.items.push(p);
         }
     }
 
@@ -1089,6 +1369,16 @@ class Game {
         // BGMパラメータ更新
         this.sound.setBGMParams(this.score, this.inRapidCurrentZone);
 
+        // 実績チェック
+        this.checkAchievements();
+
+        // ランクアップチェック
+        const newRank = this.getRank(this.score);
+        if (newRank !== this.currentRank) {
+            this.currentRank = newRank;
+            this.showNotification('👑', `ランクアップ！\n${newRank}`);
+        }
+
         // ボス出現判定
         if (this.score - this.lastBossDistance >= CONSTANTS.BOSS_INTERVAL) {
             this.lastBossDistance = Math.floor(this.score);
@@ -1099,7 +1389,12 @@ class Game {
             setTimeout(() => {
                 this.uiWarning.classList.remove('active');
                 if (this.state === STATE.PLAYING) {
-                    this.enemies.push(new Whale(this.width, this.height / 2));
+                    // 深海(2000m以上)ならダイオウイカ、それ以外はクジラ
+                    if (this.score >= 2000) {
+                        this.enemies.push(new Architeuthis(this.width, this.height / 2, this));
+                    } else {
+                        this.enemies.push(new Whale(this.width, this.height / 2));
+                    }
                 }
             }, 3000);
         }
@@ -1169,7 +1464,8 @@ class Game {
             // 左端判定（網ごと流されて死ぬ）
             if (this.player.x < -this.player.radius) {
                 this.lives = 0;
-                this.gameOver("網に捕まったまま流された");
+                const msg = this.inRapidCurrentZone ? "激流で網ごと彼方へ..." : "網に捕まったまま流された";
+                this.gameOver(msg);
                 return;
             }
         } else {
@@ -1177,7 +1473,8 @@ class Game {
             this.player.update(this);
             if (this.player.x < -this.player.radius) {
                 this.lives = 0;
-                this.gameOver("波に飲まれた");
+                const msg = this.inRapidCurrentZone ? "激流に飲み込まれ、藻屑と消えた..." : "波に飲まれた";
+                this.gameOver(msg);
                 return;
             }
         }
@@ -1190,6 +1487,11 @@ class Game {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
             enemy.update(this.scrollSpeed, this); // Hookのためにthis(game)を渡す
+
+            // 激流に流される処理
+            if (this.isRapidCurrent && Math.abs(enemy.y - this.rapidCurrentY) < 100) {
+                enemy.x -= 5.0; // 敵も流される
+            }
 
             // 削除フラグが立っている敵を削除
             if (enemy.markedForDeletion) {
@@ -1233,11 +1535,16 @@ class Game {
                     else if (enemy instanceof Whirlpool) reason = "うずしおに巻き込まれた";
                     else if (enemy instanceof Whale) reason = "巨大クジラに衝突した";
                     else if (enemy instanceof WaterSpout || enemy instanceof WaterDrop) reason = "クジラの潮吹きにやられた";
+                    else if (enemy instanceof Architeuthis || enemy instanceof GiantTentacle) reason = "ダイオウイカに捕食された";
                     else if (enemy instanceof SeaUrchin) reason = "うにに刺さった";
                     else if (enemy instanceof Crab) reason = "カニに挟まれた";
                     else if (enemy instanceof SeaAnemone) reason = "イソギンチャクに刺された";
                     else if (enemy instanceof Starfish) reason = "ヒトデに張り付かれた";
                     else if (enemy instanceof ElectricEel) reason = "電気ウナギに感電した";
+                    
+                    if (this.inRapidCurrentZone) {
+                        reason = "激流で回避不能！" + reason;
+                    }
                     this.hitPlayer(reason);
                 }
             }
@@ -1261,6 +1568,7 @@ class Game {
             
             if (item.checkCollision(this.player)) {
                 this.sound.playItem();
+                this.itemsCollected++; // 実績用カウント
                 if (item instanceof Pearl) {
                     this.score += 50;
                     this.addFloatingText(item.x, item.y, "+50", "#FFD700");
@@ -1354,12 +1662,15 @@ class Game {
 
     spawnBackgroundObjects() {
         // 沈没船 (たまに)
-        if (this.frameCount % 1200 === 0) {
+        // 深海（スコア1000以上）でのみ出現
+        if (this.score > 1000 && this.frameCount % 1200 === 0) {
             const x = this.width;
             const y = this.height - 50;
             this.backgroundObjects.push(new Shipwreck(x, y));
             // 宝箱を沈没船の近く（海底）に配置
-            this.items.push(new TreasureChest(x + 100, this.getGroundY(x + 100)));
+            const chest = new TreasureChest(x + 100, this.getGroundY(x + 100));
+            chest.radius *= this.scaleFactor;
+            this.items.push(chest);
         }
     }
 
@@ -1436,7 +1747,14 @@ class Game {
         }
 
         // アイテム描画
-        this.items.forEach(i => i.draw(this.ctx));
+        this.items.forEach(i => {
+            this.ctx.save();
+            this.ctx.translate(i.x, i.y);
+            this.ctx.scale(this.scaleFactor, this.scaleFactor);
+            this.ctx.translate(-i.x, -i.y);
+            i.draw(this.ctx);
+            this.ctx.restore();
+        });
 
         // フローティングテキスト描画
         this.floatingTexts.forEach(t => t.draw(this.ctx));
@@ -1445,7 +1763,14 @@ class Game {
         this.particles.forEach(p => p.draw(this.ctx));
 
         // 敵描画
-        this.enemies.forEach(e => e.draw(this.ctx));
+        this.enemies.forEach(e => {
+            this.ctx.save();
+            this.ctx.translate(e.x, e.y);
+            this.ctx.scale(this.scaleFactor, this.scaleFactor);
+            this.ctx.translate(-e.x, -e.y);
+            e.draw(this.ctx);
+            this.ctx.restore();
+        });
 
         // 装飾描画
         this.decorations.forEach(d => d.draw(this.ctx, this.frameCount));
@@ -2172,35 +2497,39 @@ class Shark extends Enemy {
         }
     }
     draw(ctx) {
-        ctx.fillStyle = '#708090'; // SlateGray
-        
-        // 体
+        // ホホジロザメ風
+        const grad = ctx.createLinearGradient(this.x - 40, this.y - 20, this.x + 40, this.y + 20);
+        grad.addColorStop(0, '#708090'); // SlateGray (背中)
+        grad.addColorStop(0.5, '#A9A9A9'); // DarkGray
+        grad.addColorStop(1, '#F0F8FF'); // AliceBlue (腹)
+        ctx.fillStyle = grad;
+
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 40, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 背びれ
-        ctx.beginPath();
-        ctx.moveTo(this.x + 5, this.y - 10);
-        ctx.lineTo(this.x - 5, this.y - 30);
-        ctx.lineTo(this.x - 15, this.y - 10);
-        ctx.fill();
-        
+        // 流線型の体
+        ctx.moveTo(this.x - 50, this.y + 5); // 鼻先
+        ctx.quadraticCurveTo(this.x - 20, this.y - 25, this.x + 20, this.y - 15); // 背中
+        ctx.lineTo(this.x + 50, this.y - 5); // 尾柄
         // 尾びれ
-        ctx.beginPath();
-        ctx.moveTo(this.x + 35, this.y);
-        ctx.lineTo(this.x + 55, this.y - 15);
-        ctx.lineTo(this.x + 55, this.y + 15);
+        ctx.lineTo(this.x + 70, this.y - 25); // 上葉
+        ctx.lineTo(this.x + 60, this.y);
+        ctx.lineTo(this.x + 70, this.y + 25); // 下葉
+        ctx.lineTo(this.x + 50, this.y + 5);
+        // 腹
+        ctx.quadraticCurveTo(this.x, this.y + 20, this.x - 30, this.y + 15);
+        ctx.lineTo(this.x - 50, this.y + 5);
         ctx.fill();
-        
+
+        // 背びれ（鋭く）
+        ctx.beginPath();
+        ctx.moveTo(this.x + 5, this.y - 18);
+        ctx.lineTo(this.x - 10, this.y - 45);
+        ctx.quadraticCurveTo(this.x - 15, this.y - 30, this.x - 20, this.y - 15);
+        ctx.fill();
+
         // 目
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(this.x - 25, this.y - 5, 4, 0, Math.PI * 2);
-        ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 27, this.y - 5, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x - 35, this.y - 2, 2.5, 0, Math.PI * 2);
         ctx.fill();
         
         // エラ
@@ -2208,8 +2537,18 @@ class Shark extends Enemy {
         ctx.lineWidth = 2;
         for(let i=0; i<3; i++) {
             ctx.beginPath();
-            ctx.moveTo(this.x - 10 + i*5, this.y - 5);
-            ctx.lineTo(this.x - 10 + i*5, this.y + 5);
+            ctx.moveTo(this.x - 15 + i*6, this.y - 5);
+            ctx.lineTo(this.x - 15 + i*6, this.y + 10);
+            ctx.stroke();
+        }
+
+        // 歯（ギザギザ）
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 45, this.y + 8);
+        for(let i=0; i<5; i++) {
+            ctx.lineTo(this.x - 40 + i*3, this.y + 12);
+            ctx.lineTo(this.x - 38 + i*3, this.y + 8);
             ctx.stroke();
         }
     }
@@ -2226,36 +2565,74 @@ class Anglerfish extends Enemy {
         this.y += Math.sin(this.angle += 0.03) * 0.5;
     }
     draw(ctx) {
-        // 暗い体色
-        ctx.fillStyle = '#191970'; // MidnightBlue
-        ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 30, 25, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        const scale = 1.2;
+        ctx.scale(scale, scale);
         
-        // 口
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.moveTo(this.x - 20, this.y + 5);
-        ctx.lineTo(this.x - 10, this.y + 15);
-        ctx.lineTo(this.x + 10, this.y + 5);
-        ctx.fill();
+        // リアルなチョウチンアンコウ（Melanocetus johnsonii風）
+        // 体
+        const grad = ctx.createRadialGradient(10, 5, 5, 0, 0, 35);
+        grad.addColorStop(0, '#2F2F2F');
+        grad.addColorStop(0.6, '#101010');
+        grad.addColorStop(1, '#000000');
+        ctx.fillStyle = grad;
         
-        // 提灯の柄
-        ctx.strokeStyle = '#ccc';
-        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y - 25);
-        ctx.quadraticCurveTo(this.x + 20, this.y - 50, this.x + 40, this.y - 10);
-        ctx.stroke();
+        // 丸みを帯びた体
+        ctx.moveTo(20, -10); // 上顎
+        ctx.bezierCurveTo(10, -35, -30, -35, -40, -5); // 背中
+        ctx.lineTo(-45, 0); // 尾の付け根
+        ctx.lineTo(-40, 5);
+        ctx.bezierCurveTo(-30, 35, 10, 35, 25, 10); // 腹〜下顎
+        ctx.lineTo(20, -10); // 口を閉じる（あるいは開ける）
+        ctx.fill();
 
-        // 提灯の光
-        ctx.fillStyle = '#ADFF2F'; // GreenYellow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#ADFF2F';
+        // 巨大な口と鋭い歯
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.beginPath();
-        ctx.arc(this.x + 40, this.y - 10, 6, 0, Math.PI * 2);
+        // 上の歯
+        for(let i=0; i<5; i++) {
+            ctx.moveTo(20 - i*6, -5);
+            ctx.lineTo(18 - i*6, 8); // 長い歯
+            ctx.lineTo(16 - i*6, -5);
+        }
+        // 下の歯
+        for(let i=0; i<6; i++) {
+            ctx.moveTo(22 - i*5, 10);
+            ctx.lineTo(20 - i*5, -2); // 長い歯
+            ctx.lineTo(18 - i*5, 10);
+        }
+        ctx.fill();
+
+        // 目（小さく退化しているが不気味に光る）
+        ctx.fillStyle = '#E0FFFF';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#E0FFFF';
+        ctx.beginPath();
+        ctx.arc(5, -15, 1.5, 0, Math.PI*2);
         ctx.fill();
         ctx.shadowBlur = 0;
+
+        // 提灯の柄
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(10, -25); // 頭頂部から
+        ctx.bezierCurveTo(20, -50, 40, -40, 45, -20); // 前に垂らす
+        ctx.stroke();
+
+        // 提灯の光（発光エフェクト強化）
+        const glowGrad = ctx.createRadialGradient(45, -20, 2, 45, -20, 15);
+        glowGrad.addColorStop(0, '#FFFFFF');
+        glowGrad.addColorStop(0.4, '#00FFFF'); // Cyan glow
+        glowGrad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(45, -20, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
     }
 }
 
@@ -2269,9 +2646,24 @@ class Hook extends Enemy {
     update(speed, game) {
         this.x -= speed; // スクロールに合わせて移動
         this.y += this.vy; // 上から下へ
+        
         if (game) {
-            const groundY = game.getGroundY(this.x);
-            if (this.y > groundY) this.y = groundY;
+            let limitY = game.getGroundY(this.x);
+            
+            // 岩との当たり判定（岩の上で止まるように）
+            const rocks = game.decorations.filter(d => d instanceof RuggedTerrain);
+            for (const rock of rocks) {
+                const startX = rock.x + rock.points[0].x;
+                const endX = rock.x + rock.points[rock.points.length - 1].x;
+                if (this.x >= startX && this.x <= endX) {
+                    const info = rock.getSurfaceInfo(this.x);
+                    if (info && info.y < limitY) {
+                        limitY = info.y;
+                    }
+                }
+            }
+            
+            if (this.y > limitY) this.y = limitY;
         }
     }
     draw(ctx) {
@@ -2365,11 +2757,30 @@ class Squid extends Enemy {
         this.lungeTimer = Math.floor(Math.random() * 100);
         this.vx = 0;
         this.vy = 0;
+        this.isSleeping = false;
     }
-    update(speed) {
+    update(speed, game) {
         this.x -= speed;
         this.timer += 0.05;
         this.lungeTimer++;
+
+        // 深海では動きが鈍くなる（寝ている）
+        const isDeep = game && game.score > 1000;
+        if (isDeep) {
+            this.isSleeping = true;
+            // 地面に沈む
+            const groundY = game.getGroundY(this.x);
+            if (this.y < groundY - 20) {
+                this.y += 0.5;
+            } else {
+                this.y = groundY - 20;
+            }
+            // ゆらゆら小さく
+            this.y += Math.sin(this.timer) * 0.2;
+            return; // ダッシュしない
+        } else {
+            this.isSleeping = false;
+        }
 
         // 摩擦
         this.vx *= 0.95;
@@ -2391,6 +2802,61 @@ class Squid extends Enemy {
         }
     }
     draw(ctx) {
+        if (this.isSleeping) {
+            // 寝そべっているイカ（洗練版）
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // 影
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 30, 10, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // 体
+            const grad = ctx.createLinearGradient(0, -15, 0, 10);
+            grad.addColorStop(0, '#FFF5EE');
+            grad.addColorStop(1, '#FFE4C4'); // Bisque
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.ellipse(0, -5, 25, 12, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // ヒレ
+            ctx.beginPath();
+            ctx.moveTo(20, -10);
+            ctx.quadraticCurveTo(35, -15, 30, 0);
+            ctx.fill();
+
+            // 足（だらんと地面に）
+            ctx.strokeStyle = '#FFE4C4';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            for(let i=0; i<5; i++) {
+                ctx.beginPath();
+                const startX = -20 + i*10;
+                ctx.moveTo(startX, 0);
+                ctx.quadraticCurveTo(startX, 10, startX + (Math.random()-0.5)*15, 15);
+                ctx.stroke();
+            }
+
+            // 閉じ目
+            ctx.strokeStyle = '#A0522D'; // Sienna
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(-5, -8, 4, Math.PI * 0.2, Math.PI * 0.8);
+            ctx.stroke();
+
+            // Zzz...
+            ctx.fillStyle = '#A0522D';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText('z', 15, -15);
+            ctx.fillText('z', 20, -20);
+
+            ctx.restore();
+            return;
+        }
+
         const grad = ctx.createRadialGradient(this.x, this.y - 10, 0, this.x, this.y, 20);
         grad.addColorStop(0, '#FFF5EE');
         grad.addColorStop(1, '#FFE4E1');
@@ -2427,7 +2893,7 @@ class Squid extends Enemy {
         }
         
         // 目
-        ctx.fillStyle = 'black';
+        ctx.fillStyle = this.isSleeping ? 'transparent' : 'black';
         ctx.beginPath();
         ctx.arc(this.x - 8, this.y - 5, 3, 0, Math.PI*2);
         ctx.arc(this.x + 8, this.y - 5, 3, 0, Math.PI*2);
@@ -2655,14 +3121,77 @@ class Octopus extends Enemy {
         this.radius = 25;
         this.angle = Math.random() * Math.PI * 2;
         this.moveTimer = Math.random() * 100; // 初期値をランダムにして個体差を出す
+        this.isSleeping = false;
     }
-    update(speed) {
+    update(speed, game) {
         this.x -= speed;
         this.moveTimer += 0.1;
-        // 激しい動き: 大きなサイン波 + 小刻みな震え
-        this.y += Math.sin(this.moveTimer) * 4 + Math.sin(this.moveTimer * 3) * 2;
+        
+        const isDeep = game && game.score > 1000;
+        if (isDeep) {
+            this.isSleeping = true;
+            // 地面に沈む
+            const groundY = game.getGroundY(this.x);
+            if (this.y < groundY - 25) {
+                this.y += 0.5;
+            } else {
+                this.y = groundY - 25;
+            }
+            // 動き控えめ
+            this.y += Math.sin(this.moveTimer * 0.5) * 1;
+        } else {
+            this.isSleeping = false;
+            // 激しい動き: 大きなサイン波 + 小刻みな震え
+            this.y += Math.sin(this.moveTimer) * 4 + Math.sin(this.moveTimer * 3) * 2;
+        }
     }
     draw(ctx) {
+        if (this.isSleeping) {
+            // 寝そべっているタコ（洗練版）
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // 影
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 40, 15, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // 足（だらんと地面に）
+            ctx.strokeStyle = '#CD5C5C';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            for(let i=0; i<6; i++) {
+                ctx.beginPath();
+                const angle = (i/5 - 0.5) * Math.PI * 1.2 + (Math.random()-0.5)*0.2;
+                ctx.moveTo(0, -5);
+                ctx.quadraticCurveTo(Math.cos(angle)*20, 10, Math.cos(angle)*40, 5);
+                ctx.stroke();
+            }
+
+            // 頭（平べったく）
+            const grad = ctx.createRadialGradient(0, -10, 2, 0, -5, 25);
+            grad.addColorStop(0, '#E9967A');
+            grad.addColorStop(1, '#CD5C5C');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.ellipse(0, -10, 25, 15, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 閉じ目 (˘ ˘)
+            ctx.strokeStyle = '#8B0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(-8, -12, 4, Math.PI * 0.2, Math.PI * 0.8);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(8, -12, 4, Math.PI * 0.2, Math.PI * 0.8);
+            ctx.stroke();
+
+            ctx.restore();
+            return;
+        }
+
         const grad = ctx.createRadialGradient(this.x, this.y - 10, 2, this.x, this.y - 5, 15);
         grad.addColorStop(0, '#E9967A');
         grad.addColorStop(1, '#CD5C5C');
@@ -2996,6 +3525,16 @@ class Whale extends Enemy {
         this.radius = 150; // さらに大きく
         this.timer = 0;
         this.attackTimer = 0;
+        
+        // 洗練されたマッコウクジラのシルエット
+        this.bodyPath = new Path2D();
+        this.bodyPath.moveTo(120, 0); // 尾の付け根
+        this.bodyPath.quadraticCurveTo(80, -60, 0, -50); // 背中
+        this.bodyPath.bezierCurveTo(-50, -55, -110, -50, -130, -20); // 頭頂部
+        this.bodyPath.lineTo(-130, 20); // 頭前面
+        this.bodyPath.quadraticCurveTo(-120, 55, -80, 50); // 下顎
+        this.bodyPath.quadraticCurveTo(0, 65, 120, 10); // 腹
+        this.bodyPath.closePath();
     }
     update(speed, game) {
         // ボスはゆっくり迫ってくる
@@ -3007,13 +3546,13 @@ class Whale extends Enemy {
         if (this.attackTimer > 180) { // 約3秒ごと
             this.attackTimer = 0;
             // 背中あたりから潮吹き
-            game.enemies.push(new WaterSpout(this.x + 75, this.y - 60));
+            game.enemies.push(new WaterSpout(this.x - 80, this.y - 50));
             
             // 水滴をばら撒く
             for(let i=0; i<5; i++) {
                 const vx = (Math.random() - 0.8) * 10; // 左方向に飛ばす
                 const vy = -Math.random() * 15 - 5; // 上に強く飛ばす
-                game.enemies.push(new WaterDrop(this.x + 75, this.y - 60, vx, vy));
+                game.enemies.push(new WaterDrop(this.x - 80, this.y - 50, vx, vy));
             }
         }
     }
@@ -3024,87 +3563,1131 @@ class Whale extends Enemy {
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        const scale = 2.0; // もっと巨大化
+        const scale = 2.0;
         ctx.scale(scale, scale);
 
-        // マッコウクジラ風
-        // 色: 背景（深海）と同化しないよう、かなり明るいグレーに変更
-        const grad = ctx.createLinearGradient(-150, -50, 100, 50);
-        grad.addColorStop(0, '#E0E0E0'); // Light Gray
-        grad.addColorStop(1, '#78909C'); // Blue Gray
+        // 影
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.beginPath();
+        ctx.ellipse(0, 80, 150, 30, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // 体の描画（上から光が当たっているように）
+        const grad = ctx.createRadialGradient(0, -80, 50, 0, 0, 200);
+        grad.addColorStop(0, '#FFFFFF');
+        grad.addColorStop(0.5, '#E0E0E0');
+        grad.addColorStop(1, '#A0A0A0');
         ctx.fillStyle = grad;
+        // 体の描画
+        ctx.fill(this.bodyPath);
+        
+        // 輪郭線
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke(this.bodyPath);
+
+        // 皮膚の質感（シワや傷）
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // 頭部のシワ
+        for(let i=0; i<6; i++) {
+            ctx.moveTo(-120 + i*10, -40);
+            ctx.quadraticCurveTo(-110 + i*10, 0, -120 + i*10, 40);
+        }
+        // 体の傷
+        ctx.moveTo(20, -20); ctx.lineTo(40, -25);
+        ctx.moveTo(50, 10); ctx.lineTo(60, 5);
+        ctx.stroke();
+
+        // 胸ビレ
+        ctx.save();
+        ctx.translate(-40, 30);
+        ctx.rotate(0.2);
+        ctx.fillStyle = '#C0C0C0';
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(-10, 20, -5, 35, 10, 30);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // 尾びれ
+        ctx.fillStyle = '#B0B0B0';
+        ctx.beginPath();
+        ctx.moveTo(120, 5);
+        ctx.bezierCurveTo(160, -40, 170, 0, 160, 40);
+        ctx.quadraticCurveTo(130, 10, 120, 5);
+        ctx.fill();
+
+        // 目（古代の生物のような賢さ）
+        ctx.fillStyle = '#101010';
+        ctx.beginPath();
+        ctx.arc(-100, 15, 3, 0, Math.PI * 2);
+        ctx.fill();
+        // 目の周りのシワ
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(-100, 15, 5, Math.PI*0.8, Math.PI * 1.8);
+        ctx.stroke();
+
+        // 潮吹きの穴
+        ctx.fillStyle = '#606060';
+        ctx.beginPath();
+        ctx.ellipse(-90, -48, 5, 2, -0.2, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class Architeuthis extends Enemy {
+    constructor(x, y, game) {
+        super(x, y);
+        this.radius = 120;
+        this.game = game;
+        this.timer = 0;
+        this.attackTimer = 0;
+        
+        // 巨大な外套膜とヒレのパス
+        // 左向き（頭が左、ヒレが右）
+        // (0,0)を中心とする
+        this.bodyPath = new Path2D();
+        // 外套膜（よりリアルな流線型）
+        this.bodyPath.moveTo(0, -35); 
+        this.bodyPath.bezierCurveTo(80, -50, 180, -40, 220, -10); // 背中
+        // ヒレ（ハート型に近い）
+        this.bodyPath.bezierCurveTo(260, -60, 300, 0, 220, 10); 
+        // 腹側
+        this.bodyPath.bezierCurveTo(180, 40, 80, 50, 0, 35); 
+        this.bodyPath.closePath();
+    }
+    update(speed, game) {
+        // ゆっくり迫る
+        this.x -= speed * 0.6;
+        this.y += Math.sin(this.timer += 0.02) * 0.5;
+
+        // 触手攻撃
+        this.attackTimer++;
+        if (this.attackTimer > 180) { // 3秒ごと（少し遅く）
+            this.attackTimer = 0;
+            // プレイヤーを狙う触手を生成
+            // 画面外（右下や右上）から伸びてくるイメージ
+            const targetY = game.player.y;
+            game.enemies.push(new GiantTentacle(this.x - 60, this.y, targetY));
+        }
+    }
+    isOffScreen(w, h) { return this.x < -500; }
+    draw(ctx) {
+        if (!isFinite(this.x) || !isFinite(this.y)) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        const scale = 1.5;
+        ctx.scale(scale, scale);
+
+        // 色: 深紅〜赤紫
+        const grad = ctx.createLinearGradient(0, -50, 200, 50);
+        grad.addColorStop(0, '#8B0000'); // DarkRed
+        grad.addColorStop(1, '#C71585'); // MediumVioletRed
+        // 質感を追加
+        ctx.fillStyle = grad;
+        
+        // 外套膜描画
+        ctx.fill(this.bodyPath);
+        
+        // 斑点模様
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        for(let i=0; i<10; i++) {
+            ctx.beginPath();
+            ctx.arc(50 + Math.random()*150, (Math.random()-0.5)*60, Math.random()*5+2, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 腕（触腕以外の8本）の付け根
+        // 頭部より先に描画するか、位置を調整して自然につなげる
+        ctx.fillStyle = '#8B0000';
+        for(let i=-3; i<=3; i++) {
+            if (i === 0) continue; // 中央は空ける
+            ctx.beginPath();
+            // 頭部の内側から生やす
+            ctx.moveTo(-40, i*6);
+            // うねる腕
+            ctx.bezierCurveTo(-80, i*10, -90, i*15, -120, i*12 + (Math.random()-0.5)*10);
+            ctx.lineTo(-115, i*12 + 4);
+            ctx.bezierCurveTo(-90, i*15 + 4, -80, i*10 + 4, -40, i*6 + 4);
+            ctx.fill();
+        }
+
+        // 頭部（目と腕の付け根）- 胴体と滑らかにつなぐ
+        ctx.fillStyle = '#8B0000';
+        ctx.beginPath();
+        ctx.ellipse(-30, 0, 45, 35, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // 巨大な目
+        const eyeGrad = ctx.createRadialGradient(-40, -5, 2, -40, -5, 15);
+        eyeGrad.addColorStop(0, '#FFFFE0');
+        eyeGrad.addColorStop(0.5, '#FFD700');
+        eyeGrad.addColorStop(1, '#DAA520');
+        ctx.fillStyle = eyeGrad;
+        ctx.beginPath();
+        ctx.arc(-40, -5, 14, 0, Math.PI*2);
+        ctx.fill();
+        // 瞳孔
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-40, -5, 6, 0, Math.PI*2);
+        ctx.fill();
+        // 目のハイライト
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(-45, -10, 4, 0, Math.PI*2);
+        ctx.fill();
+
+        // 漏斗（水を吹く管）
+        ctx.fillStyle = '#A52A2A';
+        ctx.beginPath();
+        ctx.moveTo(-20, 25);
+        ctx.quadraticCurveTo(-30, 40, -40, 35);
+        ctx.lineTo(-35, 25);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class GiantTentacle extends Enemy {
+    constructor(x, y, targetY) {
+        super(x, y);
+        this.radius = 15;
+        this.targetY = targetY;
+        this.life = 100;
+        this.length = 10;
+        this.maxLength = 400;
+        this.angle = Math.atan2(targetY - y, -200); // 左方向へ伸ばす
+    }
+    update(speed) {
+        this.x -= speed; // 本体と一緒に動く
+        if (this.life > 50) {
+            this.length += 15; // 伸びる
+            if (this.length > this.maxLength) this.length = this.maxLength;
+        } else {
+            this.length -= 15; // 縮む
+        }
+        this.life--;
+        if (this.life <= 0) this.markedForDeletion = true;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // 触手
+        const grad = ctx.createLinearGradient(0, 0, this.length, 0); // 根本から先端へ
+        grad.addColorStop(0, '#8B0000');
+        grad.addColorStop(1, '#C71585'); // 本体と同じ色味に
+        ctx.fillStyle = grad;
+
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        // うねりながら伸びる
+        for(let i=0; i<=this.length; i+=20) {
+            const w = 8 * (1 - i/this.maxLength * 0.5); // 先細り
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.lineTo(i, -w + wave);
+        }
+        for(let i=this.length; i>=0; i-=20) {
+            const w = 8 * (1 - i/this.maxLength * 0.5);
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.lineTo(i, w + wave);
+        }
+        ctx.fill();
+
+        // 吸盤
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        for(let i=20; i<this.length; i+=30) {
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.beginPath();
+            // 下側に吸盤をつける
+            const w = 8 * (1 - i/this.maxLength * 0.5);
+            ctx.arc(i, wave + w, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+    checkCollision(player) {
+        // 簡易的に先端付近に判定を持つ
+        const tipX = this.x + Math.cos(this.angle) * this.length;
+        const tipY = this.y + Math.sin(this.angle) * this.length;
+        const dx = tipX - player.x;
+        const dy = tipY - player.y;
+        // 触手の先端から少し手前まで判定を持たせる
+        return Math.sqrt(dx*dx + dy*dy) < (30 + player.radius);
+    }
+}
+
+class WaterSpout extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 30;
+        this.life = 60; // 1秒間持続
+        this.maxHeight = 300;
+        this.currentHeight = 0;
+    }
+    update(speed) {
+        this.x -= speed * 0.8; // クジラと同じ速度で動く
+        this.life--;
+        if (this.life > 40) {
+            this.currentHeight += 20; // 伸びる
+        } else if (this.life < 20) {
+            this.currentHeight -= 20; // 縮む
+        }
+        // 寿命が尽きたら画面外へ飛ばして削除させる
+        if (this.life <= 0) this.y = 9999;
+    }
+    draw(ctx) {
+        const grad = ctx.createLinearGradient(this.x - 20, this.y, this.x + 20, this.y - this.currentHeight);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        grad.addColorStop(1, 'rgba(173, 216, 230, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(this.x - 10, this.y);
+        ctx.lineTo(this.x - 30, this.y - this.currentHeight);
+        ctx.lineTo(this.x + 30, this.y - this.currentHeight);
+        ctx.lineTo(this.x + 10, this.y);
+        ctx.fill();
+    }
+    checkCollision(player) {
+        // 矩形判定
+        if (player.x > this.x - 30 && player.x < this.x + 30) {
+            if (player.y > this.y - this.currentHeight && player.y < this.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+class WaterDrop extends Enemy {
+    constructor(x, y, vx, vy) {
+        super(x, y);
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = 8;
+    }
+    update(speed) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.5; // 重力
+        this.x -= speed;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#87CEFA';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Shipwreck {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    update(scrollSpeed) {
+        this.x -= scrollSpeed * 0.5; // パララックス
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = 'rgba(20, 10, 0, 0.4)'; // 暗い茶色のシルエット
+        // 船の形
+        ctx.beginPath();
+        ctx.moveTo(-100, 0);
+        ctx.lineTo(-80, -40); // 船尾
+        ctx.lineTo(60, -30); // 甲板
+        ctx.lineTo(100, -10); // 船首（折れてる）
+        ctx.lineTo(80, 20); // 船底
+        ctx.lineTo(-90, 20);
+        ctx.fill();
+        
+        // マスト（折れてる）
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(20, 10, 0, 0.4)';
+        ctx.beginPath();
+        ctx.moveTo(-20, -35);
+        ctx.lineTo(-10, -80);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-10, -60);
+        ctx.lineTo(20, -50); // 横木
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+}
+
+class Pearl {
+    constructor(x, y, vx = 0, vy = 0) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = 15;
+    }
+    update(speed, game) {
+        this.x -= speed;
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        this.vx *= 0.95; // 摩擦
+        this.vy *= 0.95;
+
+        if (game) {
+            const floorY = game.getGroundY(this.x) - 15; // 半径分引く
+            if (this.y < floorY) {
+                this.vy += 0.2; // 重力
+            } else if (this.y > floorY) {
+                this.y = floorY;
+                this.vy = -this.vy * 0.6; // バウンド
+                if(Math.abs(this.vy) < 1) this.vy = 0;
+            }
+        }
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // 貝殻
+        const shellGrad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + 20);
+        shellGrad.addColorStop(0, '#FFC0CB'); // Pink
+        shellGrad.addColorStop(1, '#DB7093'); // PaleVioletRed
+        ctx.fillStyle = shellGrad;
+        
+        // 下の貝
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 10, 15, 0, Math.PI, false);
+        ctx.fill();
+        // 上の貝（開いている）
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 10, 15, Math.PI, 0, false);
+        ctx.fill();
+        
+        // 蝶番
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.fillRect(this.x - 3, this.y + 22, 6, 4);
+        ctx.fill();
+
+        // 真珠
+        const pearlGrad = ctx.createRadialGradient(this.x - 2, this.y + 8, 1, this.x, this.y + 10, 8);
+        pearlGrad.addColorStop(0, '#FFFFFF');
+        pearlGrad.addColorStop(1, '#F0F8FF');
+        ctx.fillStyle = pearlGrad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // 真珠の輝き
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 2, this.y + 3, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class TreasureChest {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 20;
+    }
+    update(speed, game) {
+        this.x -= speed;
+        if (game) {
+            const groundY = game.getGroundY(this.x);
+            this.y = groundY - 20;
+        }
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // 箱
+        ctx.fillStyle = '#8B4513'; // SaddleBrown
+        ctx.fillRect(this.x - 20, this.y - 15, 40, 30);
+        
+        // 蓋のライン
+        ctx.fillStyle = '#A0522D'; // Sienna
+        ctx.fillRect(this.x - 20, this.y - 15, 40, 10);
+        
+        // 金具
+        ctx.fillStyle = '#FFD700'; // Gold
+        ctx.fillRect(this.x - 5, this.y - 5, 10, 10); // 鍵穴
+        ctx.fillRect(this.x - 20, this.y - 15, 40, 4); // 上の縁
+        ctx.fillRect(this.x - 20, this.y + 11, 40, 4); // 下の縁
+        ctx.fillRect(this.x - 20, this.y - 15, 4, 30); // 左の縁
+        ctx.fillRect(this.x + 16, this.y - 15, 4, 30); // 右の縁
+        
+        // 輝き
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 15, this.y - 10);
+        ctx.lineTo(this.x - 5, this.y - 10);
+        ctx.lineTo(this.x - 15, this.y + 10);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class Plankton {
+    constructor(x, y, vx = 0, vy = 0) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = 8;
+        this.angle = Math.random() * Math.PI * 2;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+        this.y += Math.sin(this.angle += 0.1) * 0.5; // ふわふわ
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // プランクトン（微生物風デザイン）
+        ctx.fillStyle = 'rgba(152, 251, 152, 0.4)'; // PaleGreen, translucent
+        ctx.beginPath();
+        // 少し歪んだ円
+        const r = this.radius;
+        ctx.moveTo(this.x + r, this.y);
+        for(let i=1; i<=8; i++) {
+            const angle = i * Math.PI / 4;
+            const dist = r + Math.sin(Date.now() / 200 + i * 2) * 2;
+            ctx.lineTo(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // 核
+        ctx.fillStyle = '#32CD32'; // LimeGreen
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 内部の粒
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        for(let i=0; i<3; i++) {
+            ctx.beginPath();
+            ctx.arc(this.x + (Math.random()-0.5)*6, this.y + (Math.random()-0.5)*6, 1, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#90EE90';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class FriendShrimp extends Plankton {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 12;
+    }
+    draw(ctx) {
+        // アイテムとしての仲間エビもエビらしい見た目に
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = '#FFB6C1'; // LightPink
         
         // 体
         ctx.beginPath();
-        // 頭部（巨大な四角い頭）
-        ctx.moveTo(100, -30); // 鼻先上
-        ctx.lineTo(-80, -40); // 背中へ
-        // 背中から尾へ
-        ctx.quadraticCurveTo(150, -40, 250, -5); // 尾柄へ
-        // 尾びれ付け根
-        ctx.lineTo(250, 5);
-        // 腹側
-        ctx.quadraticCurveTo(100, 40, -60, 40); // 腹
-        // 下顎（細長い）
-        ctx.lineTo(80, 35); // 下顎先端
-        ctx.lineTo(90, 25); // 口角
-        ctx.lineTo(100, -30); // 鼻先に戻る
+        ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 節
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(-3, -2, 3, 0, Math.PI, false);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(3, -2, 3, 0, Math.PI, false);
         ctx.fill();
 
-        // 輪郭のハイライト（背中側）を追加して視認性を向上
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 1.5;
+        // 尻尾
+        ctx.fillStyle = '#FFB6C1';
         ctx.beginPath();
-        ctx.moveTo(100, -30); // 鼻先上
-        ctx.lineTo(-80, -40); // 背中へ
-        ctx.quadraticCurveTo(150, -40, 250, -5); // 尾柄へ
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(-16, 5);
+        ctx.lineTo(-16, -5);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(8, -2, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+class Seaweed {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.height = Math.random() * 100 + 80; // 大きくする
+        this.swayOffset = Math.random() * Math.PI * 2;
+    }
+    update(speed) { this.x -= speed; }
+    draw(ctx, frameCount) {
+        const sway = Math.sin(frameCount * 0.05 + this.swayOffset) * 20;
+        ctx.strokeStyle = '#2E8B57'; // SeaGreen
+        ctx.lineWidth = 10; // 太くする
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.quadraticCurveTo(this.x + sway, this.y - this.height / 2, this.x + sway * 0.5, this.y - this.height);
         ctx.stroke();
+    }
+}
+
+class RuggedTerrain {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = Math.random() * 300 + 250; // 幅を大きく
+        this.baseHeight = Math.random() * 200 + 100; // 高さを大きく
+        this.points = [];
+        // 相対座標でポイントを生成（リプレイ時の描画崩れ防止）
+        const segments = 10;
+        for (let i = 0; i <= segments; i++) {
+            const px = (i / segments) * this.width; // xは0からの相対
+            const py = this.y - this.baseHeight - (Math.random() - 0.5) * 80;
+            this.points.push({x: px, y: py - this.y}); // yもthis.yからの相対
+        }
+    }
+    update(speed, game) { 
+        this.x -= speed;
+        // pointsは相対座標なので更新不要
+    }
+    draw(ctx) {
+        const grad = ctx.createLinearGradient(this.x, this.y - this.baseHeight, this.x, this.y);
+        grad.addColorStop(0, '#606060');
+        grad.addColorStop(1, '#404040');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.points[0].x, this.y);
+        this.points.forEach(p => ctx.lineTo(this.x + p.x, this.y + p.y));
+        ctx.lineTo(this.x + this.points[this.points.length - 1].x, this.y);
+        ctx.fill();
+
+        // ハイライト
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.points[0].x, this.y + this.points[0].y);
+        for(let i=1; i<this.points.length; i++) {
+            // 上向きの辺にのみハイライト
+            if (this.points[i].y < this.points[i-1].y) {
+                ctx.moveTo(this.x + this.points[i-1].x, this.y + this.points[i-1].y);
+                ctx.lineTo(this.x + this.points[i].x, this.y + this.points[i].y);
+            }
+        }
+        ctx.stroke();
+    }
+    
+    getSurfaceInfo(x) {
+        // xは絶対座標
+        for (let i = 0; i < this.points.length - 1; i++) {
+            const p1x = this.x + this.points[i].x;
+            const p2x = this.x + this.points[i+1].x;
+            
+            if (x >= p1x && x <= p2x) {
+                const ratio = (x - p1x) / (p2x - p1x);
+                const p1y = this.y + this.points[i].y;
+                const p2y = this.y + this.points[i+1].y;
+                
+                const y = p1y + (p2y - p1y) * ratio;
+                const slope = (p2y - p1y) / (p2x - p1x);
+                return { y: y, slope: slope };
+            }
+        }
+        return null;
+    }
+
+    checkSideCollision(player) {
+        // 左側面との衝突判定
+        const leftEdgeTop = {x: this.x + this.points[0].x, y: this.y + this.points[0].y};
+        const leftEdgeBottom = {x: this.x + this.points[0].x, y: this.y};
+        const dist = this.distToSegment(player, leftEdgeTop, leftEdgeBottom);
+        return dist < player.radius;
+    }
+
+    distToSegment(p, v, w) {
+        const l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
+        if (l2 === 0) return Math.sqrt((p.x - v.x)**2 + (p.y - v.y)**2);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2);
+    }
+}
+
+class Coral {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.color = ['#CD5C5C', '#B22222', '#8B4513'][Math.floor(Math.random() * 3)];
+        this.branches = [];
+        // 枝分かれしたサンゴ
+        for(let i=0; i<8; i++) {
+            const h = Math.random() * 50 + 30;
+            const angle = (Math.random() - 0.5) * 1.0; // 傾き
+            this.branches.push({
+                x: (Math.random() - 0.5) * 40,
+                h: h,
+                w: Math.random() * 8 + 4,
+                angle: angle
+            });
+        }
+    }
+    update(speed) { this.x -= speed; }
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        this.branches.forEach(b => {
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(this.x + b.x, this.y);
+            ctx.rotate(b.angle);
+            ctx.roundRect(-b.w/2, -b.h, b.w, b.h, b.w/2);
+            ctx.fill();
+            ctx.restore();
+        });
+        // 背景として馴染ませる
+        ctx.fillStyle = 'rgba(0, 20, 40, 0.2)';
+        this.branches.forEach(b => {
+            ctx.beginPath();
+            ctx.save();
+            ctx.translate(this.x + b.x, this.y);
+            ctx.rotate(b.angle);
+            ctx.roundRect(-b.w/2, -b.h, b.w, b.h, b.w/2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+}
+
+class Clownfish {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 12;
+        this.angle = 0;
+    }
+    update(speed) {
+        this.x -= speed;
+        this.y += Math.sin(this.angle += 0.1) * 0.5;
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // カクレクマノミ（オレンジに白帯）
+        ctx.fillStyle = '#FF4500'; // OrangeRed
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 15, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 白帯
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.fillRect(this.x - 5, this.y - 7, 3, 14);
+        ctx.fillRect(this.x + 3, this.y - 6, 3, 12);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 2, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class GardenEel {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 10;
+        this.height = 30;
+    }
+    update(speed) {
+        this.x -= speed;
+    }
+    isOffScreen() { return this.x < -50; }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = (this.y - 15) - player.y; // 当たり判定は頭付近
+        return Math.sqrt(dx*dx + dy*dy) < (this.radius + player.radius);
+    }
+    draw(ctx) {
+        // チンアナゴ（白に黒点）
+        ctx.fillStyle = '#F0F8FF'; // AliceBlue
+        ctx.beginPath();
+        ctx.roundRect(this.x - 4, this.y - this.height, 8, this.height, 4);
+        ctx.fill();
+        
+        // 黒点
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - 20, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y - 10, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 2, this.y - 26, 1, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class Bubble {
+    constructor(x, y, isBackground = false) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 5 + 2;
+        this.isBackground = isBackground;
+        
+        if (isBackground) {
+            this.life = Math.random() * 0.5 + 0.1; // 背景用は薄く
+            this.decay = 0.002 + Math.random() * 0.003; // 長持ち
+            this.vy = Math.random() * 1.5 + 0.5; // 上昇速度
+            this.vxFactor = 0.1; // スクロール影響少なめ（遠景感）
+        } else {
+            this.life = 1.0;
+            this.decay = 0.02;
+            this.vy = 1;
+            this.vxFactor = 0.5;
+        }
+    }
+    update(speed) {
+        this.x -= speed * this.vxFactor;
+        this.y -= this.vy;
+        this.life -= this.decay;
+    }
+    draw(ctx) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, this.life)})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+class StreamLine {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.length = Math.random() * 100 + 50;
+    }
+    update(speed) {
+        this.x -= speed;
+    }
+    draw(ctx) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + this.length, this.y);
+        ctx.stroke();
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.life = 1.0;
+        this.vy = -1.5;
+    }
+    update() {
+        this.y += this.vy;
+        this.life -= 0.02;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 24px "M PLUS Rounded 1c", sans-serif';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 4;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+// ゲーム開始
+window.onload = () => new Game();
+
+</script>
+</body>
+</html>
+        ctx.stroke(this.bodyPath);
 
         // 皮膚の質感（シワ）
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         for(let i=0; i<5; i++) {
-            ctx.moveTo(-50 + i*30, -35);
-            ctx.quadraticCurveTo(-40 + i*30, 0, -50 + i*30, 35);
+            ctx.moveTo(-100 + i*30, -40);
+            ctx.quadraticCurveTo(-90 + i*30, 0, -100 + i*30, 40);
         }
         ctx.stroke();
 
         // 胸ビレ（短く丸い）
-        ctx.fillStyle = '#3E4E5A';
+        ctx.fillStyle = '#E6E6FA'; // Lavender
         ctx.beginPath();
-        ctx.moveTo(-20, 20);
-        ctx.quadraticCurveTo(-40, 45, -10, 35);
-        ctx.quadraticCurveTo(-15, 25, -20, 20);
+        ctx.moveTo(-40, 20);
+        ctx.quadraticCurveTo(-60, 45, -30, 35);
+        ctx.quadraticCurveTo(-35, 25, -40, 20);
         ctx.fill();
 
         // 尾びれ（大きく）
-        ctx.fillStyle = '#2F3F4F';
+        ctx.fillStyle = '#B0C4DE';
         ctx.beginPath();
-        ctx.moveTo(250, 0);
-        ctx.lineTo(300, -35);
-        ctx.quadraticCurveTo(290, 0, 300, 35);
-        ctx.lineTo(250, 0);
+        ctx.moveTo(100, 0);
+        ctx.lineTo(150, -40);
+        ctx.quadraticCurveTo(140, 0, 150, 40);
+        ctx.lineTo(100, 10);
         ctx.fill();
 
-        // 目（小さく、低い位置）
-        ctx.fillStyle = 'white';
+        // 目（小さく）
+        ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(-30, 15, 2, 0, Math.PI * 2);
+        ctx.arc(-90, 10, 2, 0, Math.PI * 2);
         ctx.fill();
-        // 目の周りのシワ
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        // 目の周りの白目
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
-        ctx.arc(-30, 15, 5, 0, Math.PI * 2);
+        ctx.arc(-90, 10, 4, 0, Math.PI * 2);
         ctx.stroke();
 
         // 潮吹きの穴
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = '#808080';
         ctx.beginPath();
-        ctx.ellipse(-60, -38, 5, 2, 0, 0, Math.PI*2);
+        ctx.ellipse(-80, -45, 5, 2, 0, 0, Math.PI*2);
         ctx.fill();
 
         ctx.restore();
+    }
+}
+
+class Architeuthis extends Enemy {
+    constructor(x, y, game) {
+        super(x, y);
+        this.radius = 120;
+        this.game = game;
+        this.timer = 0;
+        this.attackTimer = 0;
+        
+        // 巨大な外套膜とヒレのパス
+        // 左向き（頭が左、ヒレが右）
+        // (0,0)を中心とする
+        this.bodyPath = new Path2D();
+        // 外套膜（よりリアルな流線型）
+        this.bodyPath.moveTo(0, -35); 
+        this.bodyPath.bezierCurveTo(80, -50, 180, -40, 220, -10); // 背中
+        // ヒレ（ハート型に近い）
+        this.bodyPath.bezierCurveTo(260, -60, 300, 0, 220, 10); 
+        // 腹側
+        this.bodyPath.bezierCurveTo(180, 40, 80, 50, 0, 35); 
+        this.bodyPath.closePath();
+    }
+    update(speed, game) {
+        // ゆっくり迫る
+        this.x -= speed * 0.6;
+        this.y += Math.sin(this.timer += 0.02) * 0.5;
+
+        // 触手攻撃
+        this.attackTimer++;
+        if (this.attackTimer > 180) { // 3秒ごと（少し遅く）
+            this.attackTimer = 0;
+            // プレイヤーを狙う触手を生成
+            // 画面外（右下や右上）から伸びてくるイメージ
+            const targetY = game.player.y;
+            game.enemies.push(new GiantTentacle(this.x - 60, this.y, targetY));
+        }
+    }
+    isOffScreen(w, h) { return this.x < -500; }
+    draw(ctx) {
+        if (!isFinite(this.x) || !isFinite(this.y)) return;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        const scale = 1.5;
+        ctx.scale(scale, scale);
+
+        // 色: 深紅〜赤紫
+        const grad = ctx.createLinearGradient(0, -50, 200, 50);
+        grad.addColorStop(0, '#8B0000'); // DarkRed
+        grad.addColorStop(1, '#C71585'); // MediumVioletRed
+        // 質感を追加
+        ctx.fillStyle = grad;
+        
+        // 外套膜描画
+        ctx.fill(this.bodyPath);
+        
+        // 斑点模様
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        for(let i=0; i<10; i++) {
+            ctx.beginPath();
+            ctx.arc(50 + Math.random()*150, (Math.random()-0.5)*60, Math.random()*5+2, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 腕（触腕以外の8本）の付け根
+        // 頭部より先に描画するか、位置を調整して自然につなげる
+        ctx.fillStyle = '#8B0000';
+        for(let i=-3; i<=3; i++) {
+            if (i === 0) continue; // 中央は空ける
+            ctx.beginPath();
+            // 頭部の内側から生やす
+            ctx.moveTo(-40, i*6);
+            // うねる腕
+            ctx.bezierCurveTo(-80, i*10, -90, i*15, -120, i*12 + (Math.random()-0.5)*10);
+            ctx.lineTo(-115, i*12 + 4);
+            ctx.bezierCurveTo(-90, i*15 + 4, -80, i*10 + 4, -40, i*6 + 4);
+            ctx.fill();
+        }
+
+        // 頭部（目と腕の付け根）- 胴体と滑らかにつなぐ
+        ctx.fillStyle = '#8B0000';
+        ctx.beginPath();
+        ctx.ellipse(-30, 0, 45, 35, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // 巨大な目
+        const eyeGrad = ctx.createRadialGradient(-40, -5, 2, -40, -5, 15);
+        eyeGrad.addColorStop(0, '#FFFFE0');
+        eyeGrad.addColorStop(0.5, '#FFD700');
+        eyeGrad.addColorStop(1, '#DAA520');
+        ctx.fillStyle = eyeGrad;
+        ctx.beginPath();
+        ctx.arc(-40, -5, 14, 0, Math.PI*2);
+        ctx.fill();
+        // 瞳孔
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-40, -5, 6, 0, Math.PI*2);
+        ctx.fill();
+        // 目のハイライト
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(-45, -10, 4, 0, Math.PI*2);
+        ctx.fill();
+
+        // 漏斗（水を吹く管）
+        ctx.fillStyle = '#A52A2A';
+        ctx.beginPath();
+        ctx.moveTo(-20, 25);
+        ctx.quadraticCurveTo(-30, 40, -40, 35);
+        ctx.lineTo(-35, 25);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class GiantTentacle extends Enemy {
+    constructor(x, y, targetY) {
+        super(x, y);
+        this.radius = 15;
+        this.targetY = targetY;
+        this.life = 100;
+        this.length = 10;
+        this.maxLength = 400;
+        this.angle = Math.atan2(targetY - y, -200); // 左方向へ伸ばす
+    }
+    update(speed) {
+        this.x -= speed; // 本体と一緒に動く
+        if (this.life > 50) {
+            this.length += 15; // 伸びる
+            if (this.length > this.maxLength) this.length = this.maxLength;
+        } else {
+            this.length -= 15; // 縮む
+        }
+        this.life--;
+        if (this.life <= 0) this.markedForDeletion = true;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // 触手
+        const grad = ctx.createLinearGradient(0, 0, this.length, 0); // 根本から先端へ
+        grad.addColorStop(0, '#8B0000');
+        grad.addColorStop(1, '#C71585'); // 本体と同じ色味に
+        ctx.fillStyle = grad;
+
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        // うねりながら伸びる
+        for(let i=0; i<=this.length; i+=20) {
+            const w = 8 * (1 - i/this.maxLength * 0.5); // 先細り
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.lineTo(i, -w + wave);
+        }
+        for(let i=this.length; i>=0; i-=20) {
+            const w = 8 * (1 - i/this.maxLength * 0.5);
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.lineTo(i, w + wave);
+        }
+        ctx.fill();
+
+        // 吸盤
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        for(let i=20; i<this.length; i+=30) {
+            const wave = Math.sin(i * 0.05 + Date.now()*0.01) * 10;
+            ctx.beginPath();
+            // 下側に吸盤をつける
+            const w = 8 * (1 - i/this.maxLength * 0.5);
+            ctx.arc(i, wave + w, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+    checkCollision(player) {
+        // 簡易的に先端付近に判定を持つ
+        const tipX = this.x + Math.cos(this.angle) * this.length;
+        const tipY = this.y + Math.sin(this.angle) * this.length;
+        const dx = tipX - player.x;
+        const dy = tipY - player.y;
+        // 触手の先端から少し手前まで判定を持たせる
+        return Math.sqrt(dx*dx + dy*dy) < (30 + player.radius);
     }
 }
 

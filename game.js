@@ -134,22 +134,37 @@ class Game {
         ['mousedown', 'touchstart'].forEach(evt => this.uiTitleKari
             .addEventListener(evt, kariStartHandler));
 
-        // 隠しスタート
-        let iceClickCount = 0;
-        const iceSecretTrigger = () => {
-            iceClickCount++;
-            if (iceClickCount >= 3) {
-                this.startGame('NORMAL', 4000); // 流氷ゾーン
-            }
-        };
-        document.getElementById('btn-easy').addEventListener(
-            'click', iceSecretTrigger);
+        // 隠しスタート (D: ヘドロ, S: 宇宙, ICE: 流氷)
+        const triggerSludge = document.getElementById('trigger-sludge');
+        if (triggerSludge) {
+            triggerSludge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.startGame('NORMAL', 3000);
+            });
+        }
 
-        this.uiScore.addEventListener('click', (e) => {
-            if (e.target.innerText.includes('D')) this.startGame(
-                'NORMAL', 3000); // ヘドロゾーン
-            if (e.target.innerText.includes('S')) this.startGame(
-                'NORMAL', 5000); // 宇宙ゾーン
+        const triggerSpace = document.getElementById('trigger-space');
+        if (triggerSpace) {
+            triggerSpace.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.startGame('NORMAL', 5000);
+            });
+        }
+
+        let iceSequence = "";
+        document.querySelectorAll('.trigger-char[data-char]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const char = el.getAttribute('data-char');
+                iceSequence += char;
+                this.sound.playTone(600 + iceSequence.length * 100, 'sine', 0.1);
+                if (iceSequence === "ICE") {
+                    this.startGame('NORMAL', 4000);
+                    iceSequence = "";
+                } else if (!"ICE".startsWith(iceSequence)) {
+                    iceSequence = "";
+                }
+            });
         });
 
         // ポーズ画面のボタン
@@ -591,7 +606,7 @@ class Game {
         this.state = STATE.CAUGHT;
         this.caughtNet = net;
         this.escapeClicks = 0;
-        this.requiredClicks = 5; // 連打回数設定
+        this.requiredClicks = 3; // 連打回数設定（5回から3回へ緩和）
         this.addFloatingText(this.player.x, this.player.y - 40,
             "連打で逃げろ！", "#FF4500");
     }
@@ -813,6 +828,10 @@ class Game {
             const isDeep = this.score > 1000; // 1000m超えたら深海
             const isVeryDeep = this.score > 2000;
 
+            // ゾーンごとの敵生成
+            if (this.isSludgeZone) return this.spawnSludgeEnemies();
+            if (this.isIceZone) return this.spawnIceEnemies();
+
             if (this.isSpaceZone) {
                 this.spawnSpaceEnemies();
                 return;
@@ -948,6 +967,37 @@ class Game {
             const enemy = this.enemies[this.enemies.length - 1];
             if (enemy) {
                 enemy.radius *= this.scaleFactor;
+            }
+        }
+    }
+
+    spawnSludgeEnemies() {
+        if (this.frameCount % 60 === 0) {
+            const r = Math.random();
+            if (r < 0.6) {
+                this.enemies.push(new Trash(this.width, Math.random() * (this.height - 100) + 50));
+            } else if (r < 0.9) {
+                // ウツボ（岩陰などから出るイメージだが、ここではランダム配置）
+                this.enemies.push(new MorayEel(this.width, Math.random() * (this.height - 150) + 100));
+            } else {
+                // 視界が悪いので光る敵も少し出す
+                this.enemies.push(new Jellyfish(this.width, Math.random() * (this.height - 100) + 50));
+            }
+        }
+    }
+
+    spawnIceEnemies() {
+        if (this.frameCount % 70 === 0) {
+            const r = Math.random();
+            if (r < 0.4) {
+                this.enemies.push(new Penguin(this.width, Math.random() * (this.height / 2)));
+            } else if (r < 0.7) {
+                this.enemies.push(new Seal(this.width, Math.random() * (this.height - 100) + 50));
+            } else if (r < 0.9) {
+                this.enemies.push(new Walrus(this.width, Math.random() * (this.height - 150) + 100));
+            } else {
+                // 流氷（障害物）
+                this.enemies.push(new IceFloe(this.width, 0)); // 上部に配置
             }
         }
     }
@@ -1147,6 +1197,11 @@ class Game {
         this.scrollOffset += this.scrollSpeed;
         this.uiScore.innerText = Math.floor(this.score);
 
+        // ゾーン判定
+        this.isSludgeZone = (this.score >= 3000 && this.score < 4000);
+        this.isIceZone = (this.score >= 4000 && this.score < 5000);
+        this.isSpaceZone = (this.score >= 5000);
+
         // コンボタイマー更新
         if (this.comboTimer > 0) {
             this.comboTimer--;
@@ -1186,8 +1241,11 @@ class Game {
             setTimeout(() => {
                 this.uiWarning.classList.remove('active');
                 if (this.state === STATE.PLAYING) {
-                    // 深海(2000m以上)ならダイオウイカ、それ以外はクジラ
-                    if (this.score >= 2000) {
+                    // ゾーンボス分岐
+                    if (this.isSpaceZone) {
+                        this.enemies.push(new Planet(this.width + 200, this.height / 2));
+                    } else if (this.score >= 2000 && this.score < 3000) {
+                        // 深海ボス
                         this.enemies.push(new Architeuthis(
                             this.width, this.height /
                         2, this));
@@ -1244,7 +1302,7 @@ class Game {
                 this.rapidCurrentY) < range;
 
             if (this.inRapidCurrentZone) {
-                this.player.vx -= 0.3; // 流される力をさらに強く
+                this.player.vx -= 0.8; // 流される力をさらに強く
                 // 激流音（頻度アップ・音量アップ）
                 if (this.frameCount % 4 === 0) this.sound.playNoise(
                     0.25);
@@ -1325,6 +1383,31 @@ class Game {
             const enemy = this.enemies[i];
             enemy.update(this.scrollSpeed, this); // Hookのためにthis(game)を渡す
 
+            // クジラの吸い込み処理
+            if (enemy instanceof Whale && enemy.isSucking) {
+                // プレイヤーへの吸引力
+                const dx = enemy.x - this.player.x;
+                const dy = (enemy.y + 30) - this.player.y; // 口の位置へ
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 600) { // 影響範囲
+                    const force = (600 - dist) / 600 * 2.0; // 近いほど強い
+                    this.player.vx += (dx / dist) * force;
+                    this.player.vy += (dy / dist) * force;
+                    
+                    // ザコ敵も吸い込む
+                    this.enemies.forEach(other => {
+                        if (other !== enemy && !(other instanceof Whale)) {
+                            other.x += (enemy.x - other.x) * 0.05;
+                            other.y += ((enemy.y + 30) - other.y) * 0.05;
+                            // 口に入ったら消える
+                            if (Math.abs(other.x - enemy.x) < 50 && Math.abs(other.y - (enemy.y + 30)) < 50) {
+                                other.markedForDeletion = true;
+                            }
+                        }
+                    });
+                }
+            }
+
             // 激流に流される処理
             if (this.isRapidCurrent && Math.abs(enemy.y - this.rapidCurrentY) <
                 100) {
@@ -1385,7 +1468,7 @@ class Game {
                     else if (enemy instanceof Whirlpool) reason =
                         "うずしおに巻き込まれた";
                     else if (enemy instanceof Whale) reason =
-                        "巨大クジラに衝突した";
+                        enemy.isSucking ? "クジラに吸い込まれた" : "巨大クジラに衝突した";
                     else if (enemy instanceof WaterSpout || enemy instanceof WaterDrop)
                         reason = "クジラの潮吹きにやられた";
                     else if (enemy instanceof Architeuthis ||
@@ -1401,6 +1484,12 @@ class Game {
                         "ヒトデに張り付かれた";
                     else if (enemy instanceof ElectricEel) reason =
                         "電気ウナギに感電した";
+                    else if (enemy instanceof Trash) reason = "ゴミにぶつかった";
+                    else if (enemy instanceof MorayEel) reason = "ウツボに噛まれた";
+                    else if (enemy instanceof Penguin) reason = "ペンギンと衝突した";
+                    else if (enemy instanceof Seal || enemy instanceof Walrus) reason = "海獣にぶつかった";
+                    else if (enemy instanceof Meteor || enemy instanceof SpaceDebris) reason = "宇宙の藻屑となった";
+                    else if (enemy instanceof Planet) reason = "惑星に衝突した";
 
                     if (this.inRapidCurrentZone) {
                         reason = "激流で回避不能！" + reason;
@@ -1596,6 +1685,20 @@ class Game {
         const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
         const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
 
+        // 宇宙ゾーンの背景
+        if (this.isSpaceZone) {
+            this.ctx.fillStyle = '#0B0B3B';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            // 星を描画
+            this.ctx.fillStyle = 'white';
+            for(let i=0; i<50; i++) {
+                const sx = (this.frameCount * 0.5 + i * 137) % this.width;
+                const sy = (i * 93) % this.height;
+                const size = (i % 3) + 1;
+                this.ctx.fillRect(sx, sy, size, size);
+            }
+        } else {
+
         // 背景グラデーション (上から光が差し込む表現)
         const gradient = this.ctx.createLinearGradient(0, 0, 0,
             this.height);
@@ -1605,6 +1708,7 @@ class Game {
         gradient.addColorStop(1, `rgb(${r},${g},${b})`);
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.width, this.height);
+        }
 
         // 背景オブジェクト描画（地面より奥）
         this.backgroundObjects.forEach(o => o.draw(this.ctx));
@@ -1701,14 +1805,24 @@ class Game {
             }
         }
 
+        // ヘドロゾーン：視界不良（ヘドロオーバーレイ）
         if (this.isSludgeZone) {
-            this.ctx.fillStyle = 'rgba(107, 142, 35, 0.2)';
+            // 汚い緑のオーバーレイ
+            this.ctx.fillStyle = 'rgba(85, 107, 47, 0.4)';
             this.ctx.fillRect(0, 0, this.width, this.height);
+            // 浮遊物（ゴミ）
+            this.ctx.fillStyle = 'rgba(50, 50, 0, 0.2)';
+            for(let i=0; i<20; i++) {
+                const dx = (this.frameCount + i * 50) % this.width;
+                const dy = (i * 40) % this.height;
+                this.ctx.fillRect(dx, dy, 4, 4);
+            }
         }
+
+        // 流氷ゾーン：上部に氷
         if (this.isIceZone) {
-            this.ctx.fillStyle = 'rgba(173, 216, 230, 0.2)';
-            this.ctx.fillStyle = grad;
-            this.ctx.fillRect(0, 0, this.width, this.height);
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.fillRect(0, 0, this.width, 60); // 上部の氷
         }
 
         // 捕獲中のUI描画

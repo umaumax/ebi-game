@@ -391,19 +391,70 @@
             font-weight: bold;
             color: #555;
         }
+
+        /* Zone Styles */
+        .zone-sludge body { background-color: #556B2F; }
+        .zone-space body { background-color: #0B0B3B; }
+        .zone-ice body { background-color: #E0F7FA; }
+
+        #sludge-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(20, 30, 0, 0.6) 100%);
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+            backdrop-filter: blur(1px);
+        }
+        .zone-sludge #sludge-overlay { display: block; }
+
+        #ice-floe-top {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 80px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 100%);
+            z-index: 40;
+            display: none;
+            pointer-events: none;
+        }
+        .zone-ice #ice-floe-top { display: block; }
+
+        .zone-space {
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+        }
+
+        .trigger-char {
+            cursor: pointer;
+            display: inline-block;
+            transition: transform 0.2s, color 0.2s;
+        }
+        .trigger-char:hover {
+            transform: scale(1.2);
+            color: #FF4500;
+        }
+        .trigger-char:active {
+            transform: scale(0.9);
+        }
     </style>
 </head>
 
 <body>
 
     <div id="ui-layer">
+        <div id="sludge-overlay"></div>
+        <div id="ice-floe-top"></div>
+
         <div id="achievement-notification" class="achievement-notification">
             <span>🏆</span> <span id="achievement-text">実績解除！</span>
         </div>
 
         <div class="score-display">
-            DISTANCE: <span id="score">0</span>m<br>
-            <span style="font-size: 0.6em; color: #eee;">HI: <span id="high-score">0</span>m</span>
+            <span id="trigger-sludge" class="trigger-char" title="Start Sludge Zone">D</span>ISTANCE: <span id="score">0</span>m<br>
+            <span style="font-size: 0.6em; color: #eee;">HI-<span id="trigger-space" class="trigger-char" title="Start Space Zone">S</span>CORE: <span id="high-score">0</span>m</span>
         </div>
 
         <div class="level-display">LV: <span id="level">1</span></div>
@@ -421,7 +472,7 @@
         <div id="start-screen" class="message-box">
             <h1>えびちゃん<span id="title-kari" style="cursor: pointer; color: #FF4500;">（仮）</span></h1>
             <p>泳ぐ：タップ / スペース</p>
-            <p>難易度を選んでスタート<span id="secret-trigger-ice"></span></p>
+            <p>難易度を選んでスタート <span id="secret-trigger-ice"><span class="trigger-char" data-char="I">I</span><span class="trigger-char" data-char="C">C</span><span class="trigger-char" data-char="E">E</span></span></p>
             <div class="difficulty-select">
                 <button id="btn-easy" class="diff-btn" style="background-color: #4CAF50;">EASY</button>
                 <button id="btn-normal" class="diff-btn" style="background-color: #2196F3;">NORMAL</button>
@@ -464,6 +515,43 @@
     </div>
 
     <canvas id="gameCanvas"></canvas>
+
+    <!-- Assets for new designs and zones -->
+    <svg width="0" height="0" style="position:absolute; visibility:hidden;">
+        <defs>
+            <!-- Triangular Sleeping Squid -->
+            <symbol id="asset-squid-sleeping" viewBox="0 0 100 100">
+                <path d="M50 10 L90 80 L10 80 Z" fill="#FFF" stroke="#CCC" stroke-width="2"/>
+                <text x="30" y="60" font-size="20">zzz</text>
+            </symbol>
+            
+            <!-- Whale (Multiple parts to avoid color inversion) -->
+            <symbol id="asset-whale-body" viewBox="0 0 200 100">
+                <path d="M20,50 Q50,0 150,20 Q200,30 180,80 Q100,100 20,50" fill="#336699"/>
+                <circle cx="150" cy="40" r="5" fill="white"/>
+                <circle cx="152" cy="40" r="2" fill="black"/>
+            </symbol>
+            <symbol id="asset-whale-mouth-open" viewBox="0 0 200 100">
+                <path d="M20,50 Q50,0 150,20 Q200,30 180,80 Q100,100 20,50" fill="#336699"/>
+                <path d="M20,50 Q60,60 50,80" fill="none" stroke="black" stroke-width="3"/> <!-- Open mouth -->
+            </symbol>
+
+            <!-- Trash for Sludge Zone -->
+            <symbol id="asset-trash-can" viewBox="0 0 40 60">
+                <rect x="5" y="5" width="30" height="50" fill="#AAA" stroke="#666"/>
+                <line x1="10" y1="10" x2="10" y2="50" stroke="#888"/>
+                <line x1="20" y1="10" x2="20" y2="50" stroke="#888"/>
+                <line x1="30" y1="10" x2="30" y2="50" stroke="#888"/>
+            </symbol>
+
+            <!-- Space Zone Assets -->
+            <symbol id="asset-meteor" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" fill="#5D4037"/>
+                <circle cx="15" cy="15" r="5" fill="#3E2723"/>
+                <circle cx="35" cy="30" r="3" fill="#3E2723"/>
+            </symbol>
+        </defs>
+    </svg>
 
     <script src="./app.js"></script>
     <script src="./game.js"></script>

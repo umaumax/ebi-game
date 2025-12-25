@@ -403,6 +403,7 @@ class Hook extends Enemy {
         super(x * 0.8 + Math.random() * (x * 0.2), y);
         this.radius = 10;
         this.vy = 4.5; // 落下速度アップ
+        this.isOnRock = false;
     }
     update(speed, game) {
         this.x -= speed; // スクロールに合わせて移動
@@ -410,6 +411,7 @@ class Hook extends Enemy {
 
         if (game) {
             let limitY = game.getGroundY(this.x);
+            this.isOnRock = false;
 
             // 岩との当たり判定（岩の上で止まるように）
             const rocks = game.decorations.filter(d => d instanceof RuggedTerrain);
@@ -421,6 +423,7 @@ class Hook extends Enemy {
                     const info = rock.getSurfaceInfo(this.x);
                     if (info && info.y < limitY) {
                         limitY = info.y;
+                        this.isOnRock = true;
                     }
                 }
             }
@@ -440,10 +443,17 @@ class Hook extends Enemy {
         ctx.lineTo(this.x, this.y);
         ctx.stroke();
 
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (this.isOnRock) {
+            ctx.rotate(Math.PI / 4); // 岩の上なら傾ける
+        }
+
         // 針のJの字
         ctx.beginPath();
-        ctx.arc(this.x - 5, this.y, 10, 0, Math.PI, false);
+        ctx.arc(-5, 0, 10, 0, Math.PI, false);
         ctx.stroke();
+        ctx.restore();
     }
 }
 
@@ -525,6 +535,7 @@ class Squid extends Enemy {
         this.vx = 0;
         this.vy = 0;
         this.isSleeping = false;
+        this.attackTelegraphTimer = 0;
     }
     update(speed, game) {
         this.x -= speed;
@@ -555,6 +566,11 @@ class Squid extends Enemy {
         this.vx *= 0.95;
         this.vy *= 0.95;
 
+        // 攻撃予兆
+        if (this.lungeTimer > 70 && this.lungeTimer <= 100) {
+            this.attackTelegraphTimer++;
+        }
+
         // 定期的にダッシュ（ゲッソー風）
         if (this.lungeTimer > 100) {
             this.lungeTimer = 0;
@@ -574,6 +590,19 @@ class Squid extends Enemy {
         if (this.isSleeping) {
             this.drawSleeping(ctx, this.timer);
             return;
+        }
+
+        // 攻撃予兆（触手を伸ばして狙いを定めるような描画）
+        if (this.lungeTimer > 70 && this.lungeTimer <= 100) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x - 100, this.y + (Math.random()-0.5)*50); // 攻撃方向の目安
+            ctx.stroke();
+            ctx.restore();
         }
 
         const grad = ctx.createRadialGradient(this.x, this.y - 10,
@@ -601,19 +630,6 @@ class Squid extends Enemy {
         ctx.lineTo(this.x + 13, this.y - 10);
         ctx.fill();
 
-        // 足（触腕）
-        ctx.strokeStyle = '#FFF5EE';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        for (let i = -10; i <= 10; i += 5) {
-            ctx.beginPath();
-            ctx.moveTo(this.x + i, this.y);
-            ctx.quadraticCurveTo(this.x + i + Math.sin(this.timer *
-                2 + i) * 5, this.y + 15, this.x + i, this
-                    .y + 30);
-            ctx.stroke();
-        }
-
         // 目
         ctx.fillStyle = this.isSleeping ? 'transparent' : 'black';
         ctx.beginPath();
@@ -632,16 +648,21 @@ class Squid extends Enemy {
         ctx.ellipse(0, 5, 30, 10, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 体 (三角形の外套膜)
+        // 体 (三角形の外套膜 - よりイカらしく)
         const grad = ctx.createLinearGradient(0, -15, 0, 10);
         grad.addColorStop(0, '#FFF5EE');
         grad.addColorStop(1, '#FFE4C4'); // Bisque
         ctx.fillStyle = grad;
+        
+        // 寝ている形状（ヒレが垂れ下がっている）
         ctx.beginPath();
-        ctx.moveTo(0, -20); // 先端
-        ctx.lineTo(25, 5); // 右下
-        ctx.lineTo(-25, 5); // 左下
-        ctx.closePath();
+        ctx.moveTo(0, -25); // 頭頂部
+        ctx.lineTo(20, 10);
+        // 左下ボディ
+        ctx.lineTo(-20, 10);
+        // 左ヒレ（垂れる）
+        ctx.lineTo(-15, 0);
+        ctx.bezierCurveTo(-30, -10, -15, -25, 0, -25);
         ctx.fill();
 
         // 閉じ目
@@ -1014,6 +1035,96 @@ class Octopus extends Enemy {
         ctx.arc(this.x, this.y - 2, 3, 0, Math.PI * 2);
         ctx.stroke();
     }
+
+    drawSleeping(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // 影
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.beginPath();
+        ctx.ellipse(0, 25, 20, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const grad = ctx.createRadialGradient(0, -10, 2, 0, -5, 15);
+        grad.addColorStop(0, '#E9967A');
+        grad.addColorStop(1, '#CD5C5C');
+        ctx.fillStyle = grad;
+
+        // 頭
+        ctx.beginPath();
+        ctx.ellipse(0, -15, 20, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 足（だらんと垂れている）
+        ctx.strokeStyle = '#CD5C5C';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            const startX = -15 + i * 10;
+            ctx.moveTo(startX, 0);
+            ctx.quadraticCurveTo(startX, 20, startX + (i - 1.5) * 5, 30);
+            ctx.stroke();
+        }
+
+        // 閉じ目
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(-8, -10, 3, 0.1 * Math.PI, 0.9 * Math.PI); // 左目
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(8, -10, 3, 0.1 * Math.PI, 0.9 * Math.PI); // 右目
+        ctx.stroke();
+
+        // Zzz...
+        ctx.fillStyle = '#A0522D';
+        ctx.font = 'bold 12px sans-serif';
+        const t = this.moveTimer || 0;
+        ctx.fillText('z', 15, -20 + Math.sin(t * 0.1) * 2);
+        ctx.fillText('z', 20, -28 + Math.sin(t * 0.1 + 1) * 2);
+
+        // 鼻提灯（かわいさアップ）
+        // 周期的に膨らんで破裂する
+        const cycle = t * 0.05;
+        const phase = cycle % (Math.PI * 2); // 0 ~ 2PI
+        
+        if (phase < Math.PI * 1.8) {
+            // 膨らむフェーズ
+            const bubbleSize = 2 + (1 - Math.cos(phase * 0.55)) * 6; // 徐々に大きく
+            if (bubbleSize > 2) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.arc(5, -5, bubbleSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                // ハイライト
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(5 - bubbleSize * 0.3, -5 - bubbleSize * 0.3, bubbleSize * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // 破裂フェーズ（しぶき）
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for(let i=0; i<3; i++) {
+                const angle = (Math.PI * 2 / 3) * i;
+                const dist = 8;
+                ctx.beginPath();
+                ctx.arc(5 + Math.cos(angle)*dist, -5 + Math.sin(angle)*dist, 1.5, 0, Math.PI*2);
+                ctx.fill();
+            }
+            // POP text
+            ctx.fillStyle = '#FF4500';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillText('POP!', 10, -15);
+        }
+
+        ctx.restore();
+    }
 }
 
 class Porcupinefish extends Enemy {
@@ -1320,7 +1431,7 @@ class Whale extends Enemy {
         this.isSucking = false;
         this.suckTimer = 0;
 
-        // 複数のSVGパスを組み合わせるイメージで、Path2Dを複数使用
+        // 複数のパスを定義（色抜け防止のためパーツ分け）
         this.headPath = new Path2D(
             "M-130,-50 C-140,-20 -140,20 -130,50 L-80,50 C-70,0 -80,-50 -130,-50 Z"
         );
@@ -1338,20 +1449,35 @@ class Whale extends Enemy {
         this.x -= speed * 0.8; // さらに速く
         this.y += Math.sin(this.timer += 0.02) * 0.5;
 
-        // 潮吹き攻撃
+        // 攻撃サイクル
         this.attackTimer++;
-        if (this.attackTimer > 180) { // 約3秒ごと
-            this.attackTimer = 0;
-            // 背中あたりから潮吹き
-            game.enemies.push(new WaterSpout(this.x - 80, this.y -
-                50));
+        
+        // 吸い込み攻撃 (一発アウト)
+        if (this.attackTimer > 300 && this.attackTimer < 500) {
+            this.isSucking = true;
+            this.suckTimer++;
+            // 流れを作り出す処理は game.js で行う
+        } else {
+            this.isSucking = false;
+            this.suckTimer = 0;
+        }
 
-            // 水滴をばら撒く
-            for (let i = 0; i < 5; i++) {
-                const vx = (Math.random() - 0.8) * 10; // 左方向に飛ばす
-                const vy = -Math.random() * 15 - 5; // 上に強く飛ばす
-                game.enemies.push(new WaterDrop(this.x - 80, this
-                    .y - 50, vx, vy));
+        // 潮吹き攻撃 (乱数で回避可能に)
+        if (this.attackTimer > 600) {
+            this.attackTimer = 0;
+            
+            // プレイヤーの位置を見て、当たりそうな時だけ撃つ（あるいはランダムで外す）
+            if (Math.random() < 0.7) {
+                // 背中あたりから潮吹き
+                game.enemies.push(new WaterSpout(this.x - 80, this.y - 50));
+
+                // 水滴をばら撒く（隙間を作る）
+                for (let i = 0; i < 6; i++) {
+                    if (i === 3) continue; // 隙間
+                    const vx = (Math.random() - 0.8) * 10; 
+                    const vy = -Math.random() * 15 - 5; 
+                    game.enemies.push(new WaterDrop(this.x - 80, this.y - 50, vx, vy));
+                }
             }
         }
     }
@@ -1367,19 +1493,19 @@ class Whale extends Enemy {
         const scale = 2.0; // 巨大化
         ctx.scale(scale, scale);
 
-        // 色の定義
+        // 色の定義（パーツごとに塗り分ける）
         const bodyGrad = ctx.createLinearGradient(-100, -50, 100,
             50);
         bodyGrad.addColorStop(0, '#607D8B'); // Blue Grey
         bodyGrad.addColorStop(1, '#37474F'); // Darker Blue Grey
         const bellyColor = '#B0BEC5';
 
-        // 尾
+        // 尾（反転しないように個別に描画）
         ctx.fillStyle = bodyGrad;
         ctx.fill(this.tailPath);
 
         // 体
-        ctx.fillStyle = bodyGrad;
+        ctx.fillStyle = '#455A64'; // 少し色を変える
         ctx.fill(this.bodyPath);
 
         // 頭
@@ -1388,7 +1514,7 @@ class Whale extends Enemy {
 
         // 下顎
         ctx.save();
-        if (this.isSucking) {
+        if (this.isSucking) { // 吸い込み中は口を開ける
             const openAngle = Math.min(0.4, this.suckTimer * 0.01);
             ctx.translate(-70, 50);
             ctx.rotate(openAngle);
@@ -1406,16 +1532,17 @@ class Whale extends Enemy {
 
         // 吸い込みエフェクト
         if (this.isSucking) {
-            const mouthX = -130;
-            const mouthY = 40;
-            for (let i = 0; i < 10; i++) {
+            const mouthX = -140;
+            const mouthY = 30;
+            ctx.globalCompositeOperation = 'source-over'; // 確実に上に描画
+            for (let i = 0; i < 15; i++) {
                 const angle = Math.random() * Math.PI - Math.PI /
                     2;
-                const dist = Math.random() * 200;
+                const dist = Math.random() * 150 + 50;
                 const particleX = mouthX + Math.cos(angle) * dist;
                 const particleY = mouthY + Math.sin(angle) * dist;
 
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.strokeStyle = `rgba(255, 255, 255, ${Math.random()})`;
                 ctx.beginPath();
                 ctx.moveTo(particleX, particleY);
                 ctx.lineTo(particleX + (mouthX - particleX) * 0.1,
@@ -1965,6 +2092,14 @@ class FriendShrimp extends Plankton {
         ctx.arc(8, -2, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
+        // 視認性向上のための発光エフェクト
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#FF69B4';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
         ctx.restore();
     }
 }
@@ -1989,6 +2124,258 @@ class Seaweed {
         ctx.quadraticCurveTo(this.x + sway, this.y - this.height /
             2, this.x + sway * 0.5, this.y - this.height);
         ctx.stroke();
+    }
+}
+
+// --- 新規追加クラス ---
+
+// ヘドロゾーン：ゴミ
+class Trash extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 15;
+        this.angle = Math.random() * Math.PI * 2;
+        this.type = Math.random() < 0.5 ? 'can' : 'bag';
+    }
+    update(speed) {
+        this.x -= speed;
+        this.angle += 0.05;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        if (this.type === 'can') {
+            // 空き缶
+            ctx.fillStyle = '#A9A9A9';
+            ctx.fillRect(-10, -15, 20, 30);
+            ctx.fillStyle = 'red';
+            ctx.fillRect(-10, -5, 20, 10); // ラベル
+        } else {
+            // ビニール袋
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.beginPath();
+            ctx.moveTo(0, -15);
+            ctx.bezierCurveTo(15, -10, 15, 10, 0, 15);
+            ctx.bezierCurveTo(-15, 10, -15, -10, 0, -15);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+}
+
+// ヘドロゾーン：ウツボ
+class MorayEel extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 20;
+        this.timer = 0;
+    }
+    update(speed) {
+        this.x -= speed + 2; // 襲ってくる
+        this.y += Math.sin(this.timer += 0.1) * 2;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#8B4513'; // 茶色
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 40, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 口を開ける
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 40, this.y);
+        ctx.lineTo(this.x - 20, this.y - 5);
+        ctx.lineTo(this.x - 20, this.y + 5);
+        ctx.fill();
+        // 目
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x - 30, this.y - 8, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// 流氷ゾーン：ペンギン
+class Penguin extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 20;
+        this.vy = 2;
+    }
+    update(speed) {
+        this.x -= speed + 3; // 速い
+        this.y += this.vy;
+        if (this.y > 300 || this.y < 50) this.vy *= -1; // 上下移動
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.PI / 2); // 泳ぐ姿勢
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.ellipse(0, 3, 20, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// 流氷ゾーン：アザラシ
+class Seal extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 25;
+    }
+    update(speed) {
+        this.x -= speed + 1;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#D3D3D3';
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 30, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 顔
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(this.x - 25, this.y - 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// 流氷ゾーン：セイウチ
+class Walrus extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 35;
+    }
+    update(speed) {
+        this.x -= speed + 0.5;
+    }
+    draw(ctx) {
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 40, 25, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 牙
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 35, this.y + 10);
+        ctx.lineTo(this.x - 35, this.y + 25);
+        ctx.lineTo(this.x - 30, this.y + 10);
+        ctx.fill();
+    }
+}
+
+// 流氷ゾーン：流氷（障害物）
+class IceFloe extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 40;
+        this.y = 40; // 上部に固定
+    }
+    update(speed) {
+        this.x -= speed;
+    }
+    draw(ctx) {
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(this.x - 50, 0);
+        ctx.lineTo(this.x + 50, 0);
+        ctx.lineTo(this.x + 30, 60);
+        ctx.lineTo(this.x - 30, 50);
+        ctx.fill();
+    }
+}
+
+// 宇宙ゾーン：隕石
+class Meteor extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 20;
+        this.angle = 0;
+    }
+    update(speed) {
+        this.x -= speed + 4;
+        this.angle += 0.1;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = '#5D4037';
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.fill();
+        // クレーター
+        ctx.fillStyle = '#3E2723';
+        ctx.beginPath();
+        ctx.arc(-5, -5, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// 宇宙ゾーン：スペースデブリ
+class SpaceDebris extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 10;
+        this.angle = Math.random();
+    }
+    update(speed) {
+        this.x -= speed + 2;
+        this.angle += 0.2;
+    }
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = '#C0C0C0';
+        ctx.fillRect(-10, -5, 20, 10);
+        ctx.restore();
+    }
+}
+
+// 宇宙ゾーン：惑星（ボス）
+class Planet extends Enemy {
+    constructor(x, y) {
+        super(x, y);
+        this.radius = 100;
+    }
+    update(speed) {
+        this.x -= speed * 0.5;
+    }
+    draw(ctx) {
+        const grad = ctx.createRadialGradient(this.x - 30, this.y - 30, 10, this.x, this.y, 100);
+        grad.addColorStop(0, '#4CAF50');
+        grad.addColorStop(1, '#1B5E20');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 100, 0, Math.PI * 2);
+        ctx.fill();
+        // 輪っか
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, 140, 40, -0.2, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+// 宇宙ゾーン：人工衛星（背景用だが敵クラスとして実装して衝突判定を持たせることも可）
+class Satellite extends Shipwreck {
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = '#Silver';
+        ctx.fillRect(-20, -10, 40, 20); // 本体
+        ctx.fillStyle = '#87CEFA';
+        ctx.fillRect(-50, -5, 30, 10); // パネル左
+        ctx.fillRect(20, -5, 30, 10); // パネル右
+        ctx.restore();
     }
 }
 

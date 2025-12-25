@@ -20,15 +20,27 @@ class Shrimp {
         this.recoveryBoostTimer = 0;
         this.isOnGround = false;
         this.walkTimer = 0;
+        this.bonusEffectTimer = 0; // スイムボーナスエフェクト用
+        this.framesSinceLastJump = 60; // ジャンプ間隔計測用
     }
 
     jump() {
-        // 仕様: 後方＋上方向へ跳ねる
-        this.vy = CONSTANTS.JUMP_FORCE_Y;
-        this.vx = CONSTANTS.JUMP_FORCE_X;
+        // リズムよく泳ぐと前進する（スイムボーナス）
+        // 前回のジャンプから一定時間内（約0.25秒〜0.75秒）に再ジャンプした場合
+        if (this.framesSinceLastJump > 15 && this.framesSinceLastJump < 45) {
+            this.vx = 2.5; // 前進
+            this.vy = CONSTANTS.JUMP_FORCE_Y * 1.1; // 少し高く跳ぶ
+            this.bonusEffectTimer = 20; // エフェクト表示時間
+        } else {
+            // 通常: 後方＋上方向へ跳ねる
+            this.vy = CONSTANTS.JUMP_FORCE_Y;
+            this.vx = CONSTANTS.JUMP_FORCE_X;
+        }
+
         this.isBending = true;
         this.bendTimer = 15; // 変形持続フレーム
         this.recoveryBoostTimer = 30; // 泳ぎブースト
+        this.framesSinceLastJump = 0;
     }
 
     setInvincible(frames) {
@@ -37,6 +49,7 @@ class Shrimp {
 
     update(game) {
         const screenWidth = game.width;
+        this.framesSinceLastJump++;
 
         // 重力（徐々に沈む）
         this.vy += CONSTANTS.GRAVITY;
@@ -166,6 +179,9 @@ class Shrimp {
         if (this.invincibleTimer > 0) {
             this.invincibleTimer--;
         }
+        if (this.bonusEffectTimer > 0) {
+            this.bonusEffectTimer--;
+        }
 
         // 角度計算（進行方向に向ける）
         // バック中は後ろ向き、通常は前向き
@@ -239,6 +255,34 @@ class Shrimp {
         grad.addColorStop(0, '#FF8E84');
         grad.addColorStop(1, CONSTANTS.SHRIMP_COLOR);
         ctx.fillStyle = grad;
+
+        // スイムボーナスエフェクト（加速時のキラキラ）
+        if (this.bonusEffectTimer > 0) {
+            ctx.save();
+            ctx.globalAlpha = this.bonusEffectTimer / 20;
+            ctx.fillStyle = '#FFFACD'; // LemonChiffon
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'white';
+
+            // 広がるリング
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * (1.5 + (20 - this.bonusEffectTimer) * 0.1), 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 200, ${this.bonusEffectTimer / 20})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 星や光の粒を描画
+            for(let i=0; i<3; i++) {
+                const angle = (Date.now() / 100 + i * 2);
+                const dist = this.radius * 1.5;
+                const ex = Math.cos(angle) * dist;
+                const ey = Math.sin(angle) * dist;
+                ctx.beginPath();
+                ctx.arc(ex, ey, 3, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
 
         this.drawBody(ctx, this.isBending);
 

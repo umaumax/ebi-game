@@ -182,31 +182,31 @@ class Tuna extends Enemy {
         for (let i = 0; i < 6; i++) {
             // 背側
             ctx.beginPath();
-            ctx.moveTo(this.x + 15 + i * 5, this.y - 22);
-            ctx.lineTo(this.x + 18 + i * 5, this.y - 28);
-            ctx.lineTo(this.x + 21 + i * 5, this.y - 21);
+            ctx.moveTo(this.x + 15 + i * 5, this.y - 22 + i * 3);
+            ctx.lineTo(this.x + 18 + i * 5, this.y - 28 + i * 3);
+            ctx.lineTo(this.x + 21 + i * 5, this.y - 21 + i * 3);
             ctx.fill();
             // 腹側
             ctx.beginPath();
-            ctx.moveTo(this.x + 15 + i * 5, this.y + 22);
-            ctx.lineTo(this.x + 18 + i * 5, this.y + 28);
-            ctx.lineTo(this.x + 21 + i * 5, this.y + 21);
+            ctx.moveTo(this.x + 15 + i * 5, this.y + 22 - i * 3);
+            ctx.lineTo(this.x + 18 + i * 5, this.y + 28 - i * 3);
+            ctx.lineTo(this.x + 21 + i * 5, this.y + 21 - i * 3);
             ctx.fill();
         }
 
         // 第2背びれ・尻びれ（鎌状）
         ctx.fillStyle = '#191970'; // 濃紺
         ctx.beginPath();
-        ctx.moveTo(this.x + 5, this.y - 25);
-        ctx.quadraticCurveTo(this.x + 15, this.y - 45, this.x +
-            25, this.y - 20);
-        ctx.lineTo(this.x + 20, this.y - 25);
+        ctx.moveTo(this.x - 10, this.y - 25); // さらに左へ修正
+        ctx.quadraticCurveTo(this.x, this.y - 45, this.x +
+            10, this.y - 20);
+        ctx.lineTo(this.x + 5, this.y - 25);
         ctx.fill();
         ctx.fillStyle = '#F0F8FF'; // 白っぽい
         ctx.beginPath();
-        ctx.moveTo(this.x + 10, this.y + 25);
-        ctx.quadraticCurveTo(this.x + 15, this.y + 45, this.x +
-            25, this.y + 22);
+        ctx.moveTo(this.x - 5, this.y + 25); // 左へ修正
+        ctx.quadraticCurveTo(this.x + 5, this.y + 45, this.x +
+            15, this.y + 22);
         ctx.fill();
 
         // 尾びれ（三日月型）
@@ -630,47 +630,100 @@ class Squid extends Enemy {
         // 影
         ctx.fillStyle = 'rgba(0,0,0,0.1)';
         ctx.beginPath();
-        ctx.ellipse(0, 5, 30, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 10, 25, 8, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 体 (三角形の外套膜 - よりイカらしく)
-        const grad = ctx.createLinearGradient(0, -15, 0, 10);
+        // 体 (三角形の外套膜)
+        const grad = ctx.createLinearGradient(-15, 0, 15, 0);
         grad.addColorStop(0, '#FFF5EE');
         grad.addColorStop(1, '#FFE4C4'); // Bisque
         ctx.fillStyle = grad;
         
-        // 寝ている形状（ヒレが垂れ下がっている）
+        // 少し傾けて寝かせる
+        ctx.rotate(-Math.PI / 6);
+
+        // 外套膜
         ctx.beginPath();
-        ctx.moveTo(0, -25); // 頭頂部
-        ctx.lineTo(15, 0);  // 右下
-        ctx.lineTo(-15, 0); // 左下
+        ctx.moveTo(0, -20); // 頭頂部
+        ctx.lineTo(15, 10);
+        ctx.lineTo(-15, 10);
         ctx.closePath();
         ctx.fill();
 
-        // ヒレ（だらんと垂れる）
+        // 足（だらんと）
+        ctx.strokeStyle = '#FFE4C4';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        for(let i=-2; i<=2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i*3, 10);
+            ctx.quadraticCurveTo(i*5, 20, i*2, 25);
+            ctx.stroke();
+        }
+
+        // ヒレ
+        ctx.fillStyle = '#FFE4C4';
         ctx.beginPath();
-        ctx.moveTo(15, -10);
-        ctx.quadraticCurveTo(25, -5, 20, 5);
-        ctx.lineTo(15, 0);
+        ctx.moveTo(-15, 0);
+        ctx.quadraticCurveTo(-25, -5, -20, -15);
+        ctx.lineTo(-10, -10);
         ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(-15, -10);
-        ctx.quadraticCurveTo(-25, -5, -20, 5);
-        ctx.lineTo(-15, 0);
+        ctx.moveTo(15, 0);
+        ctx.quadraticCurveTo(25, -5, 20, -15);
+        ctx.lineTo(10, -10);
         ctx.fill();
 
         // 閉じ目
         ctx.strokeStyle = '#A0522D'; // Sienna
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(0, 0, 4, Math.PI * 0.2, Math.PI * 0.8);
+        ctx.arc(-5, 0, 3, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(5, 0, 3, 0.1 * Math.PI, 0.9 * Math.PI);
         ctx.stroke();
 
+        // 鼻提灯（タコ参考）
+        const t = timer;
+        const cycle = t * 0.05;
+        const phase = cycle % (Math.PI * 2);
+        
+        if (phase < Math.PI * 1.8) {
+            // 膨らむ
+            const bubbleSize = 2 + (1 - Math.cos(phase * 0.55)) * 6;
+            if (bubbleSize > 2) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.arc(0, -5, bubbleSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                // ハイライト
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(0 - bubbleSize * 0.3, -5 - bubbleSize * 0.3, bubbleSize * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // 破裂
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for(let i=0; i<3; i++) {
+                const angle = (Math.PI * 2 / 3) * i;
+                const dist = 8;
+                ctx.beginPath();
+                ctx.arc(Math.cos(angle)*dist, -5 + Math.sin(angle)*dist, 1.5, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
         // Zzz...
+        ctx.rotate(Math.PI / 6); // 文字は傾けない
         ctx.fillStyle = '#A0522D';
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('z', 20, -15 + Math.sin(timer * 2) * 2);
-        ctx.fillText('z', 25, -22 + Math.sin(timer * 2) * 2);
+        ctx.fillText('z', 15, -20 + Math.sin(timer * 0.1) * 2);
+        ctx.fillText('z', 20, -28 + Math.sin(timer * 0.1 + 1) * 2);
 
         ctx.restore();
     }
@@ -851,50 +904,53 @@ class Flatfish extends Enemy {
         grad.addColorStop(1, this.color);
         ctx.fillStyle = grad;
         ctx.beginPath();
-        // 平べったい体
-        // 捕食時は少し膨らむ
-        const h = isBiting ? 20 : 10;
-        ctx.ellipse(this.x, this.y, 25, h, 0, 0, Math.PI * 2);
+        
+        // 体（ひし形に近い楕円でヒラメらしく）
+        const h = isBiting ? 25 : 18;
+        ctx.moveTo(this.x - 30, this.y); // 頭
+        ctx.quadraticCurveTo(this.x, this.y - h, this.x + 30, this.y); // 背
+        ctx.quadraticCurveTo(this.x, this.y + h, this.x - 30, this.y); // 腹
         ctx.fill();
 
         // 斑点模様（擬態）
         ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
-        for(let i=0; i<5; i++) {
+        for(let i=0; i<8; i++) {
             ctx.beginPath();
-            ctx.arc(this.x + (Math.random()-0.5)*30, this.y + (Math.random()-0.5)*10, 2, 0, Math.PI*2);
+            ctx.arc(this.x + (Math.random()-0.5)*40, this.y + (Math.random()-0.5)*20, Math.random()*2+1, 0, Math.PI*2);
             ctx.fill();
         }
 
+        // ヒレ（エンガワ）
+        ctx.fillStyle = this.color;
+        // 背ビレ
+        ctx.beginPath();
+        ctx.moveTo(this.x - 25, this.y - 5);
+        ctx.quadraticCurveTo(this.x, this.y - h - 8, this.x + 25, this.y - 5);
+        ctx.fill();
+        // 尻ビレ
+        ctx.beginPath();
+        ctx.moveTo(this.x - 25, this.y + 5);
+        ctx.quadraticCurveTo(this.x, this.y + h + 8, this.x + 25, this.y + 5);
+        ctx.fill();
+
         // 目
-        // 捕食時は目がバッテンになるなどの演出も可能だが、シンプルに
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(this.x - 5, this.y - 5, 3, 0, Math.PI * 2);
-        ctx.arc(this.x + 5, this.y - 5, 3, 0, Math.PI * 2);
+        ctx.arc(this.x - 15, this.y - 5, 3, 0, Math.PI * 2); // 左目
+        ctx.arc(this.x - 8, this.y - 8, 3, 0, Math.PI * 2);  // 右目
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 5, this.y - 5, 1, 0, Math.PI * 2);
-        ctx.arc(this.x + 5, this.y - 5, 1, 0, Math.PI * 2);
+        ctx.arc(this.x - 15, this.y - 5, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x - 8, this.y - 8, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // ヒレ（エンガワ）
-        ctx.fillStyle = this.color;
-        // 上ヒレ
-        ctx.beginPath();
-        ctx.moveTo(this.x - 25, this.y);
-        ctx.quadraticCurveTo(this.x, this.y - 25, this.x + 25, this.y);
-        ctx.fill();
-        // 下ヒレ
-        ctx.beginPath();
-        ctx.moveTo(this.x - 25, this.y);
-        ctx.quadraticCurveTo(this.x, this.y + 25, this.x + 25, this.y);
-        ctx.fill();
         // 尾びれ
+        ctx.fillStyle = this.color;
         ctx.beginPath();
-        ctx.moveTo(this.x + 20, this.y);
-        ctx.lineTo(this.x + 32, this.y - 8);
-        ctx.lineTo(this.x + 32, this.y + 8);
+        ctx.moveTo(this.x + 28, this.y);
+        ctx.lineTo(this.x + 38, this.y - 8);
+        ctx.quadraticCurveTo(this.x + 42, this.y, this.x + 38, this.y + 8);
         ctx.fill();
     }
 
@@ -2097,49 +2153,79 @@ class Plankton {
 class FriendShrimp extends Plankton {
     constructor(x, y) {
         super(x, y);
-        this.radius = 12;
+        this.radius = 25; // サイズを大きくして取りやすくする
     }
     draw(ctx) {
-        // 仲間エビ（エビらしいシルエットに修正）
+        // 仲間エビ（主人公の後ろのエビのデザイン）
         ctx.save();
         ctx.translate(this.x, this.y);
+        
         // 左向きにする
         ctx.scale(-1, 1);
 
-        ctx.fillStyle = '#FFB6C1'; // LightPink
+        // 仲間の色（グラデーション）
+        const fGrad = ctx.createRadialGradient(0, -this.radius * 0.2, 0, 0, 0, this.radius);
+        fGrad.addColorStop(0, '#FFC0CB');
+        fGrad.addColorStop(1, '#FFB6C1');
+        ctx.fillStyle = fGrad;
+        
+        const baseStyle = fGrad;
 
-        // 頭胸部
+        // 胴体
         ctx.beginPath();
-        ctx.ellipse(5, 0, 7, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, this.radius * 1.6, this.radius * 0.6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 腹部（節）
+        // 節（セグメント）の表現
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.arc(-this.radius * 0.5 + i * this.radius * 0.5, -this.radius * 0.2, this.radius * 0.4, 0, Math.PI, false);
+            ctx.fill();
+        }
+        ctx.fillStyle = baseStyle;
+
+        // 足
+        ctx.strokeStyle = baseStyle;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            const x = -this.radius * 0.5 + i * this.radius * 0.4;
+            ctx.moveTo(x, this.radius * 0.3);
+            ctx.lineTo(x - 2, this.radius * 0.8);
+            ctx.stroke();
+        }
+
+        // 尻尾
         ctx.beginPath();
-        ctx.ellipse(13, 2, 6, 4, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(18, 4, 5, 3, 0.5, 0, Math.PI * 2);
+        ctx.moveTo(-this.radius, 0);
+        ctx.lineTo(-this.radius * 1.75, this.radius * 0.25);
+        ctx.lineTo(-this.radius * 1.75, -this.radius * 0.25);
         ctx.fill();
 
-        // 尾扇
-        ctx.beginPath();
-        ctx.moveTo(20, 4);
-        ctx.lineTo(26, 2);
-        ctx.lineTo(26, 8);
-        ctx.fill();
-
-        // 触角
-        ctx.strokeStyle = '#FFB6C1';
+        // 長い触角
+        ctx.strokeStyle = '#FF4500'; // 主人公と同じ濃いオレンジ
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(0, -2);
-        ctx.bezierCurveTo(-5, -15, -15, -5, -20, -10);
+        ctx.moveTo(this.radius, -5);
+        ctx.quadraticCurveTo(this.radius + 20, -20, this.radius + 10, -30);
+        ctx.moveTo(this.radius, -5);
+        ctx.quadraticCurveTo(this.radius + 25, -15, this.radius + 15, -35);
         ctx.stroke();
 
-        // 目
+        // 目（かわいさ重視）
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.8, -5, 6, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(2, -2, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.9, -5, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // 目のハイライト
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.9 - 1, -6, 1, 0, Math.PI * 2);
         ctx.fill();
 
         // 視認性向上のための発光エフェクト

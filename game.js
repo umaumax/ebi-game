@@ -115,14 +115,15 @@ class Game {
             {
                 id: 'collector',
                 title: 'トレジャーハンター',
-                description: 'アイテムを20個集める',
+                description: '宝箱を1個獲得',
                 icon: '💎',
-                condition: (g) => g.itemsCollected >= 20
+                condition: (g) => g.treasureChestsCollected >= 1
             }];
         this.sessionAchievements = [];
         this.unlockedAchievements = JSON.parse(localStorage.getItem(
             'ebi_achievements')) || [];
         this.itemsCollected = 0;
+        this.treasureChestsCollected = 0;
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -364,6 +365,7 @@ class Game {
         this.isInvincibleMode = false;
         this.invincibleModeUsed = false;
         this.itemsCollected = 0;
+        this.treasureChestsCollected = 0;
         this.replaySystem.buffer = [];
         this.sound.startBGM();
         this.enemies = [];
@@ -482,8 +484,13 @@ class Game {
     }
 
     getRank(score) {
+        // お散歩判定: 地面を歩いた時間が長い（3秒以上）
+        if (this.player && this.player.walkTimer > 180) {
+            return "お散歩エビ";
+        }
+
         if (score < 100) return "迷子のエビ";
-        if (score < 300) return "お散歩エビ";
+        if (score < 300) return "新米エビ";
         if (score < 500) return "冒険者";
         if (score < 1000) return "深海の旅人";
         if (score < 2000) return "深淵を覗く者";
@@ -972,6 +979,7 @@ class Game {
                 }
                 else if (item instanceof TreasureChest) {
                     this.score += 500;
+                    this.treasureChestsCollected++;
                     this.addFloatingText(item.x, item.y, "+500",
                         "#FFD700");
                 }

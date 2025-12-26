@@ -12,8 +12,8 @@ class Spawner {
         }
 
         // 難易度調整: 時間経過で出現頻度が上がる
-        let baseRate = 90;
-        let minRate = 25;
+        let baseRate = 120; // 敵の出現頻度を下げる
+        let minRate = 40;
 
         if (this.game.difficulty === 'EASY') {
             baseRate = 100;

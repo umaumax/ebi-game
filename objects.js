@@ -234,7 +234,13 @@ export class Plankton {
 export class FriendShrimp extends Plankton {
     constructor(x, y) {
         super(x, y);
-        this.radius = 50; // 当たり判定を大きくする
+        this.radius = 14; // プレイヤーのフォロワーサイズ(20*0.7)に合わせる
+        this.hitRadius = 50; // 当たり判定は大きく維持
+    }
+    checkCollision(player) {
+        const dx = this.x - player.x;
+        const dy = this.y - player.y;
+        return Math.sqrt(dx * dx + dy * dy) < (this.hitRadius + player.radius);
     }
     draw(ctx) {
         // 仲間エビ（主人公の後ろのエビのデザイン）

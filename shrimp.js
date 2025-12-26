@@ -79,6 +79,12 @@ export class Shrimp {
         this.x += this.vx;
         this.y += this.vy;
 
+        // 左端判定（ゲームオーバー）
+        if (this.x < -this.radius) {
+            game.gameOver("波にさらわれた");
+            return;
+        }
+
         // 画面端制限
         // 天井
         if (this.y < this.radius) {

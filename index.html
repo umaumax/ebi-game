@@ -440,6 +440,24 @@
             transform: scale(0.9);
         }
 
+        /* Zone Styles */
+        .zone-sludge body { background-color: #556B2F; }
+        .zone-space body { background-color: #0B0B3B; }
+        .zone-ice body { background-color: #E0F7FA; }
+
+        #sludge-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(20, 30, 0, 0.6) 100%);
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+            backdrop-filter: blur(1px);
+        }
+        .zone-sludge #sludge-overlay { display: block; }
+
+
+
         /* Gallery List */
         #gallery-list {
             position: absolute;

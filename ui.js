@@ -42,7 +42,9 @@ export class UIManager {
         this.galleryZoomLevel = 2.0;
         this.galleryPinchStartDist = 0;
 
+        this.cheatBuffer = "";
         this.setupEventListeners();
+        this.initCheatUI();
     }
 
     setupEventListeners() {
@@ -176,6 +178,66 @@ export class UIManager {
             }
         }, { passive: false });
         canvas.addEventListener('touchend', dragEnd);
+    }
+
+    initCheatUI() {
+        if (!this.scoreDisplay) return;
+        const parent = this.scoreDisplay.parentNode;
+        if (!parent) return;
+
+        // DISTANCEラベルを作成してスコアの前に挿入
+        const container = document.createElement('span');
+        container.className = 'distance-label';
+        container.style.marginRight = '10px';
+        container.style.fontWeight = 'bold';
+        container.style.color = 'white';
+        container.style.pointerEvents = 'auto';
+        container.style.position = 'relative';
+        container.style.zIndex = '1000';
+
+        const text = "DISTANCE";
+        for (let char of text) {
+            const span = document.createElement('span');
+            span.innerText = char;
+            span.style.cursor = 'pointer';
+            span.style.display = 'inline-block';
+            span.style.transition = 'transform 0.1s';
+            // 文字ごとのクリックイベント
+            span.onclick = (e) => {
+                e.stopPropagation();
+                span.style.transform = 'scale(1.5)';
+                span.style.color = '#FFFF00';
+                setTimeout(() => { span.style.transform = 'scale(1.0)'; span.style.color = 'white'; }, 200);
+                this.handleCheatInput(char);
+            };
+            container.appendChild(span);
+        }
+
+        container.appendChild(document.createTextNode(': '));
+        parent.insertBefore(container, this.scoreDisplay);
+    }
+
+    handleCheatInput(char) {
+        // D -> ヘドロゾーン (3000m)
+        if (char === 'D') {
+            this.game.sound.playItem();
+            this.game.startGame('NORMAL', 3000);
+        }
+        // S -> 宇宙ゾーン (5000m)
+        else if (char === 'S') {
+            this.game.sound.playItem();
+            this.game.startGame('NORMAL', 5000);
+        }
+        
+        // ICE -> 流氷ゾーン (4000m)
+        this.cheatBuffer += char;
+        if (this.cheatBuffer.endsWith('ICE')) {
+            this.game.sound.playItem();
+            this.game.startGame('NORMAL', 4000);
+            this.cheatBuffer = "";
+        }
+        
+        if (this.cheatBuffer.length > 10) this.cheatBuffer = this.cheatBuffer.slice(-5);
     }
 
     // --- UI Update Methods ---

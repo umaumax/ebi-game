@@ -2,7 +2,7 @@ import { CONSTANTS } from './constants.js';
 import {
     Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, SeaUrchin, Octopus, Porcupinefish, Needle,
     Whirlpool, Whale, Architeuthis, GiantTentacle, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
-    Trash, MorayEel, Penguin, Seal, Walrus, IceFloe, Meteor, SpaceDebris, Planet, Satellite
+    Trash, MorayEel, Penguin, Seal, Walrus, IceFloe
 } from './enemies.js';
 import { Pearl, TreasureChest, Plankton, FriendShrimp, Clownfish, GardenEel, Seaweed, RuggedTerrain, Coral, Shipwreck } from './objects.js';
 
@@ -48,13 +48,13 @@ export class Spawner {
         if (this.game.frameCount % spawnRate === 0) {
             const type = Math.random();
             const isDeep = this.game.score > 1000;
-            
-            // ゾーンごとの敵生成
-            if (this.game.isSludgeZone) return this.spawnSludgeEnemies();
-            if (this.game.isIceZone) return this.spawnIceEnemies();
 
-            if (this.game.isSpaceZone) {
-                this.spawnSpaceEnemies();
+            if (this.game.isSludgeZone) {
+                this.spawnSludgeEnemies();
+                return;
+            }
+            if (this.game.isIceZone) {
+                this.spawnIceEnemies();
                 return;
             }
 
@@ -245,8 +245,9 @@ export class Spawner {
                     this.game.decorations.push(new Seaweed(this.game.width,
                         groundY));
                     if (Math.random() < 0.1) {
-                        this.game.items.push(new GardenEel(this.game.width +
-                            20, groundY));
+                        const item = new GardenEel(this.game.width + 20, groundY);
+                        item.radius *= this.game.scaleFactor;
+                        this.game.items.push(item);
                     }
                 } else if (rand < (isDeep ? 0.7 : 0.9)) { // 深海での岩出現率を少し下げる
                     // isSandyフラグを追加して、砂地か岩かを制御
@@ -260,18 +261,22 @@ export class Spawner {
                     this.game.decorations.push(new Coral(this.game.width,
                         groundY));
                     if (Math.random() < 0.5) {
-                        this.game.items.push(new Clownfish(this.game.width,
-                            this.game.height - 80));
+                        const item = new Clownfish(this.game.width, this.game.height - 80);
+                        item.radius *= this.game.scaleFactor;
+                        this.game.items.push(item);
                     }
                 }
             }
         }
         if (this.game.frameCount % 300 === 0) {
-            this.game.items.push(new Pearl(this.game.width, groundY - 15));
+            const item = new Pearl(this.game.width, groundY - 15);
+            item.radius *= this.game.scaleFactor;
+            this.game.items.push(item);
         }
         if (this.game.frameCount % 100 === 0) {
-            this.game.items.push(new Plankton(this.game.width, Math.random() *
-                (this.game.height - 100) + 50));
+            const item = new Plankton(this.game.width, Math.random() * (this.game.height - 100) + 50);
+            item.radius *= this.game.scaleFactor;
+            this.game.items.push(item);
         }
         
         // 仲間エビの出現頻度調整
@@ -282,12 +287,10 @@ export class Spawner {
         }
         
         if (this.game.frameCount % friendInterval === 0) {
-            this.game.items.push(new FriendShrimp(this.game.width, Math.random() *
-                (this.game.height - 100) + 50));
+            const item = new FriendShrimp(this.game.width, Math.random() * (this.game.height - 100) + 50);
+            item.radius *= this.game.scaleFactor;
+            this.game.items.push(item);
         }
-
-        const item = this.game.items[this.game.items.length - 1];
-        if (item) item.radius *= this.game.scaleFactor;
     }
 
     scatterItems(x, y) {

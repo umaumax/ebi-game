@@ -185,6 +185,23 @@ export class UIManager {
         const parent = this.scoreDisplay.parentNode;
         if (!parent) return;
 
+        // 既存のDISTANCEテキストがあれば削除（重複防止）
+        Array.from(parent.childNodes).forEach(node => {
+            // スコア表示要素自体や、作成済みのラベルは除外
+            if (node === this.scoreDisplay || (node.classList && node.classList.contains('distance-label'))) return;
+
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('DISTANCE')) {
+                node.textContent = node.textContent.replace(/DISTANCE\s*:?/, '');
+            }
+            // 要素ノード（<span>DISTANCE</span>など）の場合も考慮して削除
+            else if (node.nodeType === Node.ELEMENT_NODE && node.textContent.includes('DISTANCE')) {
+                node.innerHTML = node.innerHTML.replace(/DISTANCE\s*:?/, '');
+            }
+        });
+
+        // 既に作成済みなら何もしない
+        if (parent.querySelector('.distance-label')) return;
+
         // DISTANCEラベルを作成してスコアの前に挿入
         const container = document.createElement('span');
         container.className = 'distance-label';

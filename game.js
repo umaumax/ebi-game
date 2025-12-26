@@ -1300,8 +1300,21 @@ export class Game {
 
         // 流氷ゾーン：上部に氷
         if (this.isIceZone) {
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            this.ctx.fillRect(0, 0, this.width, 60); // 上部の氷
+            this.ctx.fillStyle = 'rgba(220, 240, 255, 0.9)';
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            
+            const spikeWidth = 50;
+            const startIdx = Math.floor(this.scrollOffset / spikeWidth);
+            const endIdx = Math.floor((this.scrollOffset + this.width) / spikeWidth) + 1;
+            
+            for (let i = startIdx; i <= endIdx; i++) {
+                const x = i * spikeWidth - this.scrollOffset;
+                const h = 40 + Math.abs(Math.sin(i * 132.1)) * 40; // 簡易的なランダム高さ
+                this.ctx.lineTo(x, h);
+            }
+            this.ctx.lineTo(this.width, 0);
+            this.ctx.fill();
         }
 
         // 捕獲中のUI描画

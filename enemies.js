@@ -2163,19 +2163,35 @@ export class Planet extends Enemy {
         this.x -= speed * 0.5;
     }
     draw(ctx) {
+        // 土星っぽいデザイン
         const grad = ctx.createRadialGradient(this.x - 30, this.y - 30, 10, this.x, this.y, 100);
-        grad.addColorStop(0, '#4CAF50');
-        grad.addColorStop(1, '#1B5E20');
+        grad.addColorStop(0, '#F4A460'); // SandyBrown
+        grad.addColorStop(1, '#8B4513'); // SaddleBrown
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(this.x, this.y, 100, 0, Math.PI * 2);
         ctx.fill();
+
         // 輪っか
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 10;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(-0.3); // 傾き
+        ctx.scale(1.0, 0.3); // 楕円にする
+        
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 140, 40, -0.2, 0, Math.PI * 2);
+        ctx.arc(0, 0, 160, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(222, 184, 135, 0.8)'; // BurlyWood
+        ctx.lineWidth = 25;
         ctx.stroke();
+        
+        // 輪の隙間（カッシーニの間隙風）
+        ctx.beginPath();
+        ctx.arc(0, 0, 145, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(100, 80, 60, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.restore();
     }
 }
 

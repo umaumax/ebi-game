@@ -24,6 +24,7 @@ export class Game {
         this.scaleFactor = 1.0; // 画面サイズによるスケール係数
         this.state = STATE.START;
         this.score = 0;
+        this.distance = 0; // 進行距離(m)
         this.highScore = parseInt(localStorage.getItem(
             'ebi_highscore')) || 0;
         this.frameCount = 0;
@@ -40,6 +41,7 @@ export class Game {
         this.rapidCurrentWarningTimer = 0;
         this.isKelpZone = false; // 昆布ゾーン
         this.kelpZoneTimer = 0;
+        this.pushedByRockTimer = 0;
         this.isSludgeZone = false;
         this.isIceZone = false;
         this.isSpaceZone = false;
@@ -97,28 +99,28 @@ export class Game {
                 title: '冒険の始まり',
                 description: '500m到達',
                 icon: '🚩',
-                condition: (g) => g.score >= 500
+                condition: (g) => g.distance >= 500
             },
             {
                 id: 'reach_1000',
                 title: '深海への到達',
                 description: '1000m到達',
                 icon: '🌊',
-                condition: (g) => g.score >= 1000
+                condition: (g) => g.distance >= 1000
             },
             {
                 id: 'reach_2000',
                 title: '深淵の目撃者',
                 description: '2000m到達',
                 icon: '👁️',
-                condition: (g) => g.score >= 2000
+                condition: (g) => g.distance >= 2000
             },
             {
                 id: 'no_damage_1000',
                 title: '華麗なる回避',
                 description: 'ノーダメージで1000m到達',
                 icon: '✨',
-                condition: (g) => g.score >= 1000 && !g.damageTaken
+                condition: (g) => g.distance >= 1000 && !g.damageTaken
             },
             {
                 id: 'survive_boss',
@@ -158,6 +160,7 @@ export class Game {
         this.clownfishCollected = false;
         this.sessionAchievements = [];
         this.currentRank = "";
+        this.loopCount = 0;
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -367,6 +370,7 @@ export class Game {
         this.screenStart.style.display = 'none';
         this.screenGameOver.style.display = 'none';
         this.score = 0;
+        this.distance = startScore; // スタート地点(m)
         this.lives = 1;
         this.updateLifeDisplay();
         this.level = Math.floor(startScore / 100);
@@ -394,10 +398,11 @@ export class Game {
         this.escapeClicks = 0;
 
         this.damageTaken = false;
+        this.loopCount = 0;
         this.currentRank = this.getRank(0);
         this.sessionAchievements = [];
         this.unlockedAchievements = []; // 称号リセット
-        this.pushedByRock = false;
+        this.pushedByRockTimer = 0;
         this.pearlCollected = false;
         this.clownfishCollected = false;
         this.comboCount = 0;
@@ -423,7 +428,7 @@ export class Game {
 
         // 深海スタートの場合
         if (startScore > 0) {
-            this.score = startScore;
+            this.distance = startScore;
             this.addFloatingText(this.player.x, this.player.y -
                 50, "DEEP SEA MODE!", "#FF00FF");
         }
@@ -535,13 +540,13 @@ export class Game {
         if (this.clownfishCollected) return "クマノミと友達";
 
         if (score < 100) return "迷子のエビ";
-        if (score < 300) return "新米エビ";
-        if (score < 500) return "冒険者";
-        if (score < 1000) return "深海の旅人";
-        if (score < 2000) return "深淵を覗く者";
-        if (score < 3000) return "深海の主";
-        if (score < 5000) return "伝説の海老";
-        return "深海の覇者";
+        if (score < 500) return "新米エビ";
+        if (score < 1000) return "冒険者";
+        if (score < 3000) return "深海の旅人";
+        if (score < 5000) return "深淵を覗く者";
+        if (score < 10000) return "深海の主";
+        if (score < 20000) return "伝説の海老";
+        return "深海の覇王";
     }
 
     showNotification(icon, text) {
@@ -599,7 +604,7 @@ export class Game {
 
             this.ctx.fillStyle = 'white';
             this.ctx.font = 'bold 32px "M PLUS Rounded 1c"';
-            this.ctx.fillText(`記録: ${Math.floor(this.score)}m`,
+            this.ctx.fillText(`SCORE: ${Math.floor(this.score)}`,
                 this.width / 2, this.height / 2);
 
             this.ctx.fillStyle = '#FFD700';
@@ -685,15 +690,29 @@ export class Game {
         }
 
         this.frameCount++;
-        this.score += 0.1; // 距離加算
+        const distDelta = 0.1;
+        this.distance += distDelta; // 距離加算
+        // スコア加算（距離 + コンボボーナス）
+        this.score += distDelta * (1 + this.comboCount * 0.1);
+
         this.scrollOffset += this.scrollSpeed;
-        this.uiScore.innerText = Math.floor(this.score);
-        if (!this.isAscendZone) this.pushedByRock = false; // フレームごとにリセット
+        this.uiManager.updateScore(this.score, this.distance);
+        if (this.pushedByRockTimer > 0) this.pushedByRockTimer--;
+
+        // 周回ロジック (6000mで1周)
+        const loopDist = this.distance % 6000;
+        const currentLoop = Math.floor(this.distance / 6000);
+        if (currentLoop > this.loopCount) {
+            this.loopCount = currentLoop;
+            this.scrollSpeed += 1.0; // 周回ごとに速度アップ
+            this.isAscendZone = false; // 浮上終了
+            this.addFloatingText(this.width / 2, this.height / 2, `LOOP ${this.loopCount + 1}`, "#FFD700");
+        }
 
         // ゾーン判定
-        this.isSludgeZone = !this.isAscendZone && (this.score >= 3000 && this.score < 4000);
-        this.isIceZone = !this.isAscendZone && (this.score >= 4000 && this.score < 5000);
-        this.isSpaceZone = !this.isAscendZone && (this.score >= 5000);
+        this.isSludgeZone = !this.isAscendZone && (loopDist >= 3000 && loopDist < 4000);
+        this.isIceZone = !this.isAscendZone && (loopDist >= 4000 && loopDist < 5000);
+        this.isSpaceZone = !this.isAscendZone && (loopDist >= 5000);
 
         // コンボタイマー更新
         if (this.comboTimer > 0) {
@@ -712,7 +731,7 @@ export class Game {
         this.replaySystem.recordState();
 
         // BGMパラメータ更新
-        this.sound.setBGMParams(this.score, this.inRapidCurrentZone);
+        this.sound.setBGMParams(this.distance, this.inRapidCurrentZone);
 
         // 実績チェック
         this.checkAchievements();
@@ -725,8 +744,8 @@ export class Game {
         }
 
         // ボス出現判定
-        if (this.score - this.lastBossDistance >= CONSTANTS.BOSS_INTERVAL) {
-            this.lastBossDistance = Math.floor(this.score);
+        if (this.distance - this.lastBossDistance >= CONSTANTS.BOSS_INTERVAL) {
+            this.lastBossDistance = Math.floor(this.distance);
             // 警告表示
             this.uiWarning.classList.add('active');
 
@@ -737,7 +756,7 @@ export class Game {
                     // ゾーンボス分岐
                     if (this.isSpaceZone) {
                         this.enemies.push(new Planet(this.width + 200, this.height / 2));
-                    } else if (this.score >= 2000 && this.score < 3000) {
+                    } else if (this.distance >= 2000 && this.distance < 3000) {
                         // 深海ボス
                         this.enemies.push(new Architeuthis(this.width + 200, this.height / 2, this));
                     }
@@ -752,7 +771,7 @@ export class Game {
         if (this.state === STATE.BITTEN) return;
 
         // レベルアップ判定 (100mごと)
-        const currentLevel = Math.floor(this.score / 100);
+        const currentLevel = Math.floor(this.distance / 100);
         if (currentLevel > this.level) {
             this.level = currentLevel;
             this.uiManager.updateLevel(this.level + 1);
@@ -838,20 +857,18 @@ export class Game {
         }
 
         // 浮上ゾーン
-        if (this.score > 5500 && !this.isAscendZone) {
+        if (loopDist > 5500 && !this.isAscendZone) {
             this.isAscendZone = true;
             this.addFloatingText(this.width / 2, this.height / 2, "浮上開始！", "#00FFFF");
         }
 
         if (this.isAscendZone) {
             this.player.vy -= 0.05; // 上昇する力
-            this.scrollSpeed = Math.max(0.5, this.scrollSpeed * 0.995); // 徐々に減速
-            this.score -= 1.5; // 浮上してスコア（深度）が減る
+            // 速度低下や距離減少は削除（周回のため）
             if (this.frameCount % 3 === 0) {
                 // 浮上中は泡をたくさん出す
                 this.particles.push(new Bubble(this.player.x, this.player.y, false, true));
             }
-            if (this.score <= 0) this.gameOver("生還！");
         }
 
         if (this.state === STATE.CAUGHT) {
@@ -1020,15 +1037,15 @@ export class Game {
                 this.sound.playItem();
                 this.itemsCollected++; // 実績用カウント
                 if (item instanceof Pearl) {
-                    this.score += 50;
+                    this.score += 500;
                     this.pearlCollected = true;
-                    this.addFloatingText(item.x, item.y, "+50",
+                    this.addFloatingText(item.x, item.y, "+500",
                         "#FFD700");
                 }
                 else if (item instanceof TreasureChest) {
-                    this.score += 500;
+                    this.score += 1000;
                     this.treasureChestsCollected++;
-                    this.addFloatingText(item.x, item.y, "+500",
+                    this.addFloatingText(item.x, item.y, "+1000",
                         "#FFD700");
                 }
                 else if (item instanceof FriendShrimp) { // Planktonより先に判定する
@@ -1041,25 +1058,25 @@ export class Game {
                     }
                     else {
                         // ライフ満タンならスコアボーナス
-                        this.score += 100;
+                        this.score += 2000;
                         this.addFloatingText(item.x, item.y,
-                            "+100", "#FFD700");
+                            "+2000", "#FFD700");
                     }
                 }
                 else if (item instanceof Plankton) {
-                    this.score += 10;
-                    this.addFloatingText(item.x, item.y, "+10",
+                    this.score += 100;
+                    this.addFloatingText(item.x, item.y, "+100",
                         "#90EE90");
                 }
                 else if (item instanceof Clownfish) {
-                    this.score += 50;
+                    this.score += 500;
                     this.clownfishCollected = true;
-                    this.addFloatingText(item.x, item.y, "+50",
+                    this.addFloatingText(item.x, item.y, "+500",
                         "#FF4500");
                 }
                 else if (item instanceof GardenEel) {
-                    this.score += 30;
-                    this.addFloatingText(item.x, item.y, "+30",
+                    this.score += 300;
+                    this.addFloatingText(item.x, item.y, "+300",
                         "#FFFFFF");
                 }
                 this.items.splice(i, 1);
@@ -1109,7 +1126,7 @@ export class Game {
 
         // 背景の泡（スコアに応じて増える演出）
         // 深度(score)に応じて発生確率と数を上げる
-        const bubbleDensity = Math.min(20, Math.floor(this.score /
+        const bubbleDensity = Math.min(20, Math.floor(this.distance /
             300));
         if (this.frameCount % 15 === 0) {
             // 基本確率 + スコアボーナス
@@ -1172,11 +1189,12 @@ export class Game {
         // 背景クリア
         // スコアに応じて背景色を深海（暗く）にする演出
         const maxDepth = 2000; // 2000mで最も暗くなる
-        const ratio = Math.min(this.score / maxDepth, 1);
+        const loopDist = this.distance % 6000;
+        const ratio = Math.min(loopDist / maxDepth, 1);
         
         let ascendRatio = 0;
         if (this.isAscendZone) {
-            ascendRatio = 1.0 - Math.max(0, this.score / 5500);
+            ascendRatio = 1.0 - Math.max(0, loopDist / 5500);
         }
         
         // #87CEEB (135, 206, 235) -> #001020 (0, 16, 32)
@@ -1306,17 +1324,17 @@ export class Game {
 
         // 深海モード（暗闇演出）
         // スコア500mから徐々に暗くなり、プレイヤーの周りだけ明るくする
-        if (this.score > 500) {
+        if (loopDist > 500) {
             const darknessStart = 500;
             const darknessEnd = 3000;
             const maxDarkness = this.width < 600 ? 0.6 : 0.95; // スマホはかなり明るく
-            const ratio = Math.min(Math.max((this.score -
+            const ratio = Math.min(Math.max((loopDist -
                 darknessStart) / (darknessEnd - darknessStart), 0), 1);
             
             let darknessAlpha = ratio * maxDarkness;
             if (this.isAscendZone) {
                 // 浮上中はスコアが減るにつれて暗闇が晴れていく
-                const ascendRatio = Math.max(0, this.score / 5500);
+                const ascendRatio = Math.max(0, loopDist / 5500);
                 darknessAlpha *= ascendRatio;
             }
 

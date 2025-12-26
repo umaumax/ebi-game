@@ -43,13 +43,15 @@ export class Spawner {
             minRate = Math.floor(minRate * 1.2);
         }
 
-        const spawnRate = Math.max(minRate, baseRate - Math.floor(
-            this.game.score / 25));
+        // 周回数に応じて出現頻度を上げる（最小間隔を短くする）
+        const loopLevel = this.game.loopCount || 0;
+        minRate = Math.max(5, minRate - loopLevel * 3); // 周回ごとに最小間隔を3フレーム短縮（下限5）
 
+        const spawnRate = Math.max(minRate, baseRate - Math.floor(
+            this.game.distance / 25));
         if (this.game.frameCount % spawnRate === 0) {
             const type = Math.random();
-            const isDeep = this.game.score > 1000;
-
+            const isDeep = (this.game.distance % 6000) > 1000;
             if (this.game.isSludgeZone) {
                 this.spawnSludgeEnemies();
                 return;
@@ -72,9 +74,6 @@ export class Spawner {
             if (isDeep && deepSpawnType < 0.3) {
                 this.game.enemies.push(new Anglerfish(this.game.width, Math
                     .random() * (this.game.height - 100) + 50));
-            } else if (isDeep && deepSpawnType < 0.6) {
-                // 深海でも平地を定期的に作る
-                this.game.enemies.push(new Flatfish(this.game.width, this.game.height - 40));
             } else if (rock && Math.random() < 0.5) {
                 const pointIndex = Math.floor(Math.random() * (
                     rock.points.length - 2)) + 1;
@@ -99,8 +98,7 @@ export class Spawner {
                 if (!isDeep) this.game.enemies.push(new Fish(this.game.width,
                     Math.random() * (this.game.height - 100) +
                     50));
-                else this.game.enemies.push(new Flatfish(this.game.width,
-                    this.game.height - 40));
+                else this.game.enemies.push(new Flatfish(this.game.width, this.game.getGroundY(this.game.width) - 5));
             }
             else if (type < 0.35) {
                 if (!isDeep) {
@@ -157,23 +155,18 @@ export class Spawner {
                     Math.random() * (this.game.height - 100) +
                     50, this.game.player));
             }
-            else if (type < 0.97 && this.game.score > 500) { // 500m以降に出現
-                this.game.enemies.push(new Whirlpool(this.game.width, 50)); // 上部固定で見やすく
+            else if (type < 0.97 && (this.game.distance % 6000) > 500) { // 500m以降に出現
+                this.game.enemies.push(new Whirlpool(this.game.width, 50));
             }
-            else if (type < 0.98) {
-                this.game.enemies.push(new Flatfish(this.game.width, this.game.height -
-                    40));
+            else if (type < 0.98 && Math.random() < 0.5) { // ヒラメは少しレアに
+                this.game.enemies.push(new Flatfish(this.game.width, this.game.getGroundY(this.game.width) - 5));
             }
             else if (type < 0.995) {
                 this.game.enemies.push(new Crab(this.game.width, this.game.getGroundY(
                     this.game.width)));
             }
-            else if (this.game.score > 200 && Math.random() < 0.3) { // 通常ゾーンでも砂地を増やす(確率アップ)
+            else if ((this.game.distance % 6000) > 200 && Math.random() < 0.3) { // 通常ゾーンでも砂地を増やす(確率アップ)
                  this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, true));
-            }
-            else {
-                this.game.enemies.push(new SeaUrchin(this.game.width, this.game.height -
-                    65));
             }
 
             const enemy = this.game.enemies[this.game.enemies.length - 1];
@@ -232,7 +225,7 @@ export class Spawner {
                     Math.random() * this.game.height));
             }
         }
-        if (this.game.score > 5500 && !this.game.enemies.some(e => e instanceof Planet)) {
+        if ((this.game.distance % 6000) > 5500 && !this.game.enemies.some(e => e instanceof Planet)) {
             this.game.enemies.push(new Planet(this.game.width + 200, this.game.height /
                 2));
         }
@@ -240,12 +233,11 @@ export class Spawner {
 
     spawnDecorations() {
         const groundY = this.game.getGroundY(this.game.width);
-        const isDeep = this.game.score > 1000;
+        const isDeep = (this.game.distance % 6000) > 1000;
 
         if (this.game.isSpaceZone) {
             if (this.game.frameCount % 100 === 0) this.game.backgroundObjects
-                .push(new Satellite(this.game.width, Math.random() *
-                    this.game.height));
+                .push(new Satellite(this.game.width, Math.random() * this.game.height));
             return;
         }
 
@@ -297,7 +289,7 @@ export class Spawner {
         // 仲間エビの出現頻度調整
         // 基本は600フレームごとだが、ライフが少ない時や序盤は頻度を上げる
         let friendInterval = 600;
-        if (this.game.lives < 3 || this.game.score < 1000) {
+        if (this.game.lives < 3 || (this.game.distance % 6000) < 1000) {
             friendInterval = 200; // 頻度アップ（約3.3秒に1回）
         }
         
@@ -328,7 +320,7 @@ export class Spawner {
     }
 
     spawnBackgroundObjects() {
-        if (this.game.score > 1000 && this.game.frameCount % 1200 === 0) {
+        if ((this.game.distance % 6000) > 1000 && this.game.frameCount % 1200 === 0) {
             const x = this.game.width;
             const y = this.game.height - 50;
             this.game.backgroundObjects.push(new Shipwreck(x, y));

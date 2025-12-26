@@ -121,12 +121,24 @@ export class Gallery {
 
         ctx.save();
         // サイズ調整: 半径が20を超える場合は縮小する
-        if (enemy.radius && enemy.radius > 20) {
-            const scale = 20 / enemy.radius;
-            ctx.translate(25, 25);
-            ctx.scale(scale, scale);
-            ctx.translate(-25, -25);
+        let scale = 1.0;
+        const targetRadius = 18; // 余裕を持たせる
+        if (enemy.radius && enemy.radius > targetRadius) {
+            scale = targetRadius / enemy.radius;
         }
+
+        // 個別のサイズ調整（見た目が大きいもの）
+        const name = EnemyClass.name;
+        if (name === 'MorayEel') scale *= 0.7;
+        if (name === 'Seal') scale *= 0.85;
+        if (name === 'Walrus') scale *= 0.75;
+        if (name === 'Whale') scale *= 0.3;
+        if (name === 'Architeuthis') scale *= 0.4;
+        if (name === 'Penguin') scale *= 0.9;
+
+        ctx.translate(25, 25);
+        ctx.scale(scale, scale);
+        ctx.translate(-25, -25);
         
         // 一部の敵（Hookなど）は描画位置調整が必要
         if (EnemyClass.name === 'Hook') {

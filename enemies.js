@@ -887,89 +887,64 @@ export class ElectricEel extends Enemy {
 export class Flatfish extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 15;
-        // 砂に擬態する色
-        this.color = '#D2B48C';
-        this.mouthOpen = 0;
+        this.radius = 20; // 判定を少し大きく
+        this.color = '#D2B48C'; // 砂に擬態する色
+        this.state = 'hiding'; // 'hiding', 'revealing', 'biting'
+        this.revealTimer = 0;
     }
-    draw(ctx, isBiting = false) {
-        const grad = ctx.createRadialGradient(this.x, this.y, 0,
-            this.x, this.y, 25);
-        grad.addColorStop(0, '#E6CCB3');
-        grad.addColorStop(1, this.color);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        
-        // 体（ひし形に近い楕円でヒラメらしく）
-        const h = isBiting ? 25 : 18;
-        ctx.moveTo(this.x - 30, this.y); // 頭
-        ctx.quadraticCurveTo(this.x, this.y - h, this.x + 30, this.y); // 背
-        ctx.quadraticCurveTo(this.x, this.y + h, this.x - 30, this.y); // 腹
-        ctx.fill();
 
-        // 斑点模様（擬態）
-        ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
-        for(let i=0; i<8; i++) {
+    update(speed, game) {
+        this.x -= speed;
+
+        // 地面のY座標に追従
+        this.y = game.getGroundY(this.x) - 5; // 少し埋める
+
+        if (this.state === 'hiding') {
+            // プレイヤーが近づいたら姿を現す
+            const dx = this.x - game.player.x;
+            const dy = this.y - game.player.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 100) {
+                this.state = 'revealing';
+                this.revealTimer = 20; // 姿を現すまでの時間
+            }
+        } else if (this.state === 'revealing') {
+            this.revealTimer--;
+            if (this.revealTimer <= 0) {
+                this.state = 'biting';
+            }
+        }
+    }
+
+    draw(ctx, isBiting = false) {
+        const revealProgress = this.state === 'revealing' ? (20 - this.revealTimer) / 20 : (this.state === 'biting' || isBiting ? 1 : 0);
+
+        if (revealProgress < 0.1 && !isBiting) {
+            // 隠れているときは目だけ描く
+            ctx.fillStyle = 'black';
             ctx.beginPath();
-            ctx.arc(this.x + (Math.random()-0.5)*40, this.y + (Math.random()-0.5)*20, Math.random()*2+1, 0, Math.PI*2);
+            ctx.arc(this.x - 15, this.y - 2, 1.5, 0, Math.PI * 2);
+            ctx.arc(this.x - 8, this.y - 4, 1.5, 0, Math.PI * 2);
             ctx.fill();
+            return;
         }
 
-        // ヒレ（エンガワ）
-        ctx.fillStyle = this.color;
-        // 背ビレ
-        ctx.beginPath();
-        ctx.moveTo(this.x - 25, this.y - 5);
-        ctx.quadraticCurveTo(this.x, this.y - h - 8, this.x + 25, this.y - 5);
-        ctx.fill();
-        // 尻ビレ
-        ctx.beginPath();
-        ctx.moveTo(this.x - 25, this.y + 5);
-        ctx.quadraticCurveTo(this.x, this.y + h + 8, this.x + 25, this.y + 5);
-        ctx.fill();
-
-        // 目
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(this.x - 15, this.y - 5, 3, 0, Math.PI * 2); // 左目
-        ctx.arc(this.x - 8, this.y - 8, 3, 0, Math.PI * 2);  // 右目
-        ctx.fill();
-        ctx.fillStyle = 'black';
-        ctx.beginPath();
-        ctx.arc(this.x - 15, this.y - 5, 1.5, 0, Math.PI * 2);
-        ctx.arc(this.x - 8, this.y - 8, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 尾びれ
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.moveTo(this.x + 28, this.y);
-        ctx.lineTo(this.x + 38, this.y - 8);
-        ctx.quadraticCurveTo(this.x + 42, this.y, this.x + 38, this.y + 8);
-        ctx.fill();
-    }
-
-    drawSleeping(ctx, timer) {
         ctx.save();
-        ctx.translate(this.x, this.y);
+        ctx.globalAlpha = revealProgress;
 
-        // 影
-        ctx.fillStyle = 'rgba(0,0,0,0.1)';
-        ctx.beginPath();
-        ctx.ellipse(0, 5, 30, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // 飛び出すアニメーション
+        const jumpHeight = Math.sin(revealProgress * Math.PI) * 20;
+        ctx.translate(this.x, this.y - jumpHeight);
 
-        // 体の描画（通常時と同じロジックを相対座標で）
         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 25);
         grad.addColorStop(0, '#E6CCB3');
         grad.addColorStop(1, this.color);
         ctx.fillStyle = grad;
         ctx.beginPath();
         
-        const h = 18;
-        ctx.moveTo(-30, 0); // 頭
-        ctx.quadraticCurveTo(0, -h, 30, 0); // 背
-        ctx.quadraticCurveTo(0, h, -30, 0); // 腹
+        const h = isBiting ? 25 : 18;
+        ctx.moveTo(-30, 0);
+        ctx.quadraticCurveTo(0, -h, 30, 0);
+        ctx.quadraticCurveTo(0, h, -30, 0);
         ctx.fill();
 
         // 斑点模様
@@ -981,27 +956,32 @@ export class Flatfish extends Enemy {
         }
 
         // 閉じ目
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 1;
+        ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.moveTo(-18, -5);
-        ctx.lineTo(-12, -5);
-        ctx.stroke();
+        ctx.arc(-15, -5, 3, 0, Math.PI * 2);
+        ctx.arc(-8, -8, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.moveTo(-11, -8);
-        ctx.lineTo(-5, -8);
-        ctx.stroke();
-
-        // Zzz...
-        ctx.fillStyle = '#A0522D';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('z', 20, -15 + Math.sin(timer * 2) * 2);
-        ctx.fillText('z', 25, -22 + Math.sin(timer * 2) * 2);
+        ctx.arc(-15, -5, 1.5, 0, Math.PI * 2);
+        ctx.arc(-8, -8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.restore();
     }
-}
 
+    checkCollision(player) {
+        if (this.state !== 'biting') return false;
+
+        const jumpHeight = 20;
+        const currentY = this.y - jumpHeight;
+
+        const dx = this.x - player.x;
+        const dy = currentY - player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < (this.radius + player.radius);
+    }
+}
 export class SeaUrchin extends Enemy {
     constructor(x, y) {
         super(x, y);
@@ -1947,9 +1927,12 @@ export class WaterDrop extends Enemy {
 export class Trash extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 15;
+        this.radius = 18;
         this.angle = Math.random() * Math.PI * 2;
-        this.type = Math.random() < 0.5 ? 'can' : 'bag';
+        const r = Math.random();
+        if (r < 0.33) this.type = 'can';
+        else if (r < 0.66) this.type = 'bag';
+        else this.type = 'bottle';
     }
     update(speed) {
         this.x -= speed;
@@ -1960,19 +1943,64 @@ export class Trash extends Enemy {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
         if (this.type === 'can') {
-            // 空き缶
-            ctx.fillStyle = '#A9A9A9';
-            ctx.fillRect(-10, -15, 20, 30);
+            // 潰れた空き缶
+            ctx.fillStyle = '#C0C0C0';
+            ctx.beginPath();
+            ctx.moveTo(-10, -15);
+            ctx.lineTo(10, -15);
+            ctx.lineTo(8, 0); // 真ん中が凹んでいる
+            ctx.lineTo(10, 15);
+            ctx.lineTo(-10, 15);
+            ctx.lineTo(-8, 0); // 真ん中が凹んでいる
+            ctx.closePath();
+            ctx.fill();
+            
+            // ラベル
             ctx.fillStyle = 'red';
-            ctx.fillRect(-10, -5, 20, 10); // ラベル
-        } else {
+            ctx.fillRect(-9, -8, 18, 16);
+            
+            // プルタブ
+            ctx.fillStyle = '#A9A9A9';
+            ctx.beginPath();
+            ctx.arc(0, -10, 3, 0, Math.PI*2);
+            ctx.fill();
+
+        } else if (this.type === 'bag') {
             // ビニール袋
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillStyle = 'rgba(240, 248, 255, 0.5)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1;
+            
             ctx.beginPath();
             ctx.moveTo(0, -15);
             ctx.bezierCurveTo(15, -10, 15, 10, 0, 15);
             ctx.bezierCurveTo(-15, 10, -15, -10, 0, -15);
+            ctx.bezierCurveTo(-20, -10, -10, -20, 0, -15);
             ctx.fill();
+            ctx.stroke();
+            
+            // 取手
+            ctx.beginPath();
+            ctx.moveTo(-5, -15);
+            ctx.quadraticCurveTo(-10, -25, 0, -25);
+            ctx.quadraticCurveTo(10, -25, 5, -15);
+            ctx.stroke();
+
+        } else {
+            // ペットボトル
+            ctx.fillStyle = 'rgba(135, 206, 250, 0.6)';
+            ctx.beginPath();
+            ctx.rect(-8, -15, 16, 25); // 本体
+            ctx.rect(-4, -20, 8, 5);   // 首
+            ctx.fill();
+            
+            // キャップ
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(-5, -22, 10, 4);
+            
+            // ラベル
+            ctx.fillStyle = 'rgba(0, 0, 139, 0.5)';
+            ctx.fillRect(-8, -5, 16, 10);
         }
         ctx.restore();
     }
@@ -2005,10 +2033,10 @@ export class MorayEel extends Enemy {
 
         ctx.beginPath();
         // 頭
-        ctx.moveTo(-40, -10);
-        ctx.bezierCurveTo(-20, -20 + wave, 20, -20 - wave, 50, 0);
+        ctx.moveTo(-45, -5); // 中心調整
+        ctx.bezierCurveTo(-25, -20 + wave, 15, -20 - wave, 45, 0);
         // 腹
-        ctx.bezierCurveTo(20, 20 - wave, -20, 20 + wave, -40, 15);
+        ctx.bezierCurveTo(15, 20 - wave, -25, 20 + wave, -45, 15);
         ctx.closePath();
         ctx.fill();
 
@@ -2016,7 +2044,7 @@ export class MorayEel extends Enemy {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         for(let i=0; i<5; i++) {
             ctx.beginPath();
-            const px = -20 + i * 15;
+            const px = -25 + i * 15;
             const py = Math.sin(i + t) * 5;
             ctx.arc(px, py, 3, 0, Math.PI*2);
             ctx.fill();
@@ -2025,27 +2053,27 @@ export class MorayEel extends Enemy {
         // 口（大きく開ける）
         ctx.fillStyle = '#400000';
         ctx.beginPath();
-        ctx.moveTo(-40, 0);
-        ctx.lineTo(-25, -5);
-        ctx.lineTo(-25, 10);
+        ctx.moveTo(-45, 5);
+        ctx.lineTo(-30, -5);
+        ctx.lineTo(-30, 10);
         ctx.fill();
         
         // 鋭い歯
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.moveTo(-38, 0);
-        ctx.lineTo(-35, 3);
-        ctx.lineTo(-32, 0);
+        ctx.moveTo(-43, 5);
+        ctx.lineTo(-40, 3);
+        ctx.lineTo(-37, 0);
         ctx.fill();
 
         // 目
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(-32, -8, 3, 0, Math.PI * 2);
+        ctx.arc(-37, -3, 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(-33, -8, 1.5, 0, Math.PI * 2);
+        ctx.arc(-38, -3, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
@@ -2092,19 +2120,19 @@ export class Penguin extends Enemy {
         // くちばし
         ctx.fillStyle = '#FFD700';
         ctx.beginPath();
-        ctx.moveTo(-30, 0);
-        ctx.lineTo(-40, 3);
-        ctx.lineTo(-30, 6);
+        ctx.moveTo(-25, 0);
+        ctx.lineTo(-35, 3);
+        ctx.lineTo(-25, 6);
         ctx.fill();
 
         // 目
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(-22, -3, 3, 0, Math.PI * 2);
+        ctx.arc(-17, -3, 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(-23, -3, 1.5, 0, Math.PI * 2);
+        ctx.arc(-18, -3, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         // 翼（フリッパー）
@@ -2148,16 +2176,16 @@ export class Seal extends Enemy {
 
         ctx.beginPath();
         // 頭から尾へ
-        ctx.moveTo(-30, 0);
-        ctx.bezierCurveTo(-20, -20, 20, -20, 40, 0); // 背中
-        ctx.bezierCurveTo(20, 20, -20, 20, -30, 0); // 腹
+        ctx.moveTo(-35, 0);
+        ctx.bezierCurveTo(-25, -20, 15, -20, 35, 0); // 背中
+        ctx.bezierCurveTo(15, 20, -25, 20, -35, 0); // 腹
         ctx.fill();
 
         // ゴマ模様
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         for(let i=0; i<6; i++) {
             ctx.beginPath();
-            ctx.arc(-10 + Math.random()*40, (Math.random()-0.5)*20, Math.random()*2+1, 0, Math.PI*2);
+            ctx.arc(-15 + Math.random()*40, (Math.random()-0.5)*20, Math.random()*2+1, 0, Math.PI*2);
             ctx.fill();
         }
 
@@ -2165,32 +2193,32 @@ export class Seal extends Enemy {
         // 鼻
         ctx.fillStyle = '#333';
         ctx.beginPath();
-        ctx.ellipse(-32, 0, 3, 2, 0, 0, Math.PI*2);
+        ctx.ellipse(-37, 0, 3, 2, 0, 0, Math.PI*2);
         ctx.fill();
         // 目
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(-25, -5, 2.5, 0, Math.PI * 2);
+        ctx.arc(-30, -5, 2.5, 0, Math.PI * 2);
         ctx.fill();
         // ヒゲ
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(-32, 2); ctx.lineTo(-38, 5);
-        ctx.moveTo(-32, 3); ctx.lineTo(-38, 8);
+        ctx.moveTo(-37, 2); ctx.lineTo(-43, 5);
+        ctx.moveTo(-37, 3); ctx.lineTo(-43, 8);
         ctx.stroke();
 
         // 前ヒレ
         ctx.fillStyle = '#C0C0C0';
         ctx.beginPath();
-        ctx.ellipse(0, 10, 10, 5, 0.5, 0, Math.PI*2);
+        ctx.ellipse(-5, 10, 10, 5, 0.5, 0, Math.PI*2);
         ctx.fill();
 
         // 後ろヒレ
         ctx.beginPath();
-        ctx.moveTo(40, 0);
-        ctx.lineTo(50, -5);
-        ctx.lineTo(50, 5);
+        ctx.moveTo(35, 0);
+        ctx.lineTo(45, -5);
+        ctx.lineTo(45, 5);
         ctx.fill();
 
         ctx.restore();

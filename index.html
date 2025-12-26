@@ -55,8 +55,9 @@
             text-shadow: 2px 2px 0 #000;
             text-align: left;
             background: rgba(0, 0, 0, 0.3);
-            padding: 10px 20px;
+            padding: 5px 15px;
             border-radius: 10px;
+            line-height: 1.2;
         }
 
         .level-display {
@@ -150,7 +151,7 @@
                 font-size: 14px;
                 top: 15px;
                 left: 10px;
-                padding: 5px 8px;
+                padding: 5px 10px;
             }
             .level-display {
                 font-size: 14px;
@@ -454,19 +455,6 @@
             background-position: 0 0, 40px 60px, 130px 270px;
         }
 
-        .trigger-char {
-            cursor: pointer;
-            display: inline-block;
-            transition: transform 0.2s, color 0.2s;
-        }
-        .trigger-char:hover {
-            transform: scale(1.2);
-            color: #FF4500;
-        }
-        .trigger-char:active {
-            transform: scale(0.9);
-        }
-
         /* Zone Styles */
         .zone-sludge body { background-color: #556B2F; }
         .zone-space body { background-color: #0B0B3B; }
@@ -530,8 +518,9 @@
         </div>
 
         <div class="score-display">
-            <span id="trigger-sludge" class="trigger-char" title="Start Sludge Zone">D</span>ISTANCE: <span id="score">0</span>m<br>
-            <span style="font-size: 0.6em; color: #eee;">HI-<span id="trigger-space" class="trigger-char" title="Start Space Zone">S</span>CORE: <span id="high-score">0</span>m</span>
+            <div><span id="score-label">SCORE</span>: <span id="score">0</span></div>
+            <div><span id="depth-label">DEPTH</span>: <span id="distance">0</span>m</div>
+            <div style="font-size: 0.6em; color: #eee;"><span id="hi-score-label">HI-SCORE</span>: <span id="high-score">0</span></div>
         </div>
 
         <div class="level-display">LV: <span id="level">1</span></div>
@@ -621,13 +610,13 @@
             
             <!-- Whale (Multiple parts to avoid color inversion) -->
             <symbol id="asset-whale-body" viewBox="0 0 200 100">
-                <path d="M20,50 Q50,0 150,20 Q200,30 180,80 Q100,100 20,50" fill="#1A237E"/>
-                <circle cx="150" cy="40" r="5" fill="white"/>
-                <circle cx="152" cy="40" r="2" fill="black"/>
+                <path d="M180,50 Q150,0 50,20 Q0,30 20,80 Q100,100 180,50" fill="#1A237E"/>
+                <circle cx="50" cy="40" r="5" fill="white"/>
+                <circle cx="48" cy="40" r="2" fill="black"/>
             </symbol>
             <symbol id="asset-whale-mouth-open" viewBox="0 0 200 100">
-                <path d="M20,50 Q50,0 150,20 Q200,30 180,80 Q100,100 20,50" fill="#1A237E"/>
-                <path d="M20,50 Q60,60 50,80" fill="none" stroke="black" stroke-width="3"/> <!-- Open mouth -->
+                <path d="M180,50 Q150,0 50,20 Q0,30 20,80 Q100,100 180,50" fill="#1A237E"/>
+                <path d="M180,50 Q140,60 150,80" fill="none" stroke="black" stroke-width="3"/> <!-- Open mouth -->
             </symbol>
 
             <!-- Trash for Sludge Zone -->

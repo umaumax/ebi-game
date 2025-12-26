@@ -6,6 +6,7 @@ export class UIManager {
 
         // --- Element References ---
         this.scoreDisplay = document.getElementById('score');
+        this.distanceDisplay = document.getElementById('distance');
         this.levelDisplay = document.getElementById('level');
         this.lifeDisplay = document.getElementById('life-display');
         this.highScoreDisplay = document.getElementById('high-score');
@@ -184,64 +185,43 @@ export class UIManager {
     initCheatUI() {
         if (!this.scoreDisplay) return;
         const parent = this.scoreDisplay.parentNode;
-        if (!parent) return;
+        if (!parent) return; // parent is .score-display
 
-        // 既存のDISTANCEテキストがあれば削除（重複防止）
-        // index.htmlで <span id="trigger-sludge">D</span>ISTANCE: のように分かれている場合に対応
-        const triggerSludge = parent.querySelector('#trigger-sludge');
-        if (triggerSludge) triggerSludge.remove();
-
-        for (let i = 0; i < parent.childNodes.length; i++) {
-            const node = parent.childNodes[i];
-            // スコア表示要素自体や、作成済みのラベルは除外
-            if (node === this.scoreDisplay || (node.classList && node.classList.contains('distance-label'))) continue;
-
-            if (node.nodeType === Node.TEXT_NODE) {
-                if (node.textContent.includes('DISTANCE')) {
-                    node.textContent = node.textContent.replace(/DISTANCE\s*:?/, '');
-                } else if (node.textContent.includes('ISTANCE')) {
-                    node.textContent = node.textContent.replace(/ISTANCE\s*:?/, '');
-                }
+        // ラベルをインタラクティブにするヘルパー
+        const makeInteractive = (element, text) => {
+            if (!element) return;
+            element.innerHTML = ''; // クリア
+            element.style.pointerEvents = 'auto';
+            
+            for (let char of text) {
+                const span = document.createElement('span');
+                span.innerText = char;
+                span.style.cursor = 'pointer';
+                span.style.display = 'inline-block';
+                span.style.transition = 'transform 0.1s';
+                
+                span.onclick = (e) => {
+                    e.stopPropagation();
+                    span.style.transform = 'scale(1.5)';
+                    span.style.color = '#FFFF00';
+                    setTimeout(() => { span.style.transform = 'scale(1.0)'; span.style.color = 'inherit'; }, 200);
+                    this.handleCheatInput(char);
+                };
+                element.appendChild(span);
             }
-            // 要素ノード（<span>DISTANCE</span>など）の場合も考慮して削除
-            else if (node.nodeType === Node.ELEMENT_NODE && node.textContent.includes('DISTANCE')) {
-                node.innerHTML = node.innerHTML.replace(/DISTANCE\s*:?/, '');
-            }
-        }
+        };
 
-        // 既に作成済みなら何もしない
-        if (parent.querySelector('.distance-label')) return;
+        // SCOREラベル
+        const scoreLabel = document.getElementById('score-label');
+        if (scoreLabel) makeInteractive(scoreLabel, "SCORE");
 
-        // DISTANCEラベルを作成してスコアの前に挿入
-        const container = document.createElement('span');
-        container.className = 'distance-label';
-        container.style.marginRight = '10px';
-        container.style.fontWeight = 'bold';
-        container.style.color = 'white';
-        container.style.pointerEvents = 'auto';
-        container.style.position = 'relative';
-        container.style.zIndex = '1000';
+        // DEPTHラベル
+        const depthLabel = document.getElementById('depth-label');
+        if (depthLabel) makeInteractive(depthLabel, "DEPTH");
 
-        const text = "DISTANCE";
-        for (let char of text) {
-            const span = document.createElement('span');
-            span.innerText = char;
-            span.style.cursor = 'pointer';
-            span.style.display = 'inline-block';
-            span.style.transition = 'transform 0.1s';
-            // 文字ごとのクリックイベント
-            span.onclick = (e) => {
-                e.stopPropagation();
-                span.style.transform = 'scale(1.5)';
-                span.style.color = '#FFFF00';
-                setTimeout(() => { span.style.transform = 'scale(1.0)'; span.style.color = 'white'; }, 200);
-                this.handleCheatInput(char);
-            };
-            container.appendChild(span);
-        }
-
-        container.appendChild(document.createTextNode(': '));
-        parent.insertBefore(container, this.scoreDisplay);
+        // HI-SCOREラベル
+        const hiScoreLabel = document.getElementById('hi-score-label');
+        if (hiScoreLabel) makeInteractive(hiScoreLabel, "HI-SCORE");
     }
 
     handleCheatInput(char) {
@@ -258,7 +238,8 @@ export class UIManager {
         
         // ICE -> 流氷ゾーン (4000m)
         this.cheatBuffer += char;
-        if (this.cheatBuffer.endsWith('ICE')) {
+        // HI-SCOREの I, C, E を使う
+        if (this.cheatBuffer.includes('I') && this.cheatBuffer.includes('C') && this.cheatBuffer.includes('E')) {
             this.game.sound.playItem();
             this.game.startGame('NORMAL', 4000);
             this.cheatBuffer = "";
@@ -268,7 +249,10 @@ export class UIManager {
     }
 
     // --- UI Update Methods ---
-    updateScore(score) { this.scoreDisplay.innerText = Math.floor(score); }
+    updateScore(score, distance) { 
+        this.scoreDisplay.innerText = Math.floor(score);
+        if (this.distanceDisplay) this.distanceDisplay.innerText = Math.floor(distance);
+    }
     updateLevel(level) { this.levelDisplay.innerText = level; }
     updateLife(lives) {
         let hearts = '';

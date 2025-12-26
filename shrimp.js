@@ -82,7 +82,7 @@ export class Shrimp {
         // 左端判定（ゲームオーバー）
         if (this.x < -this.radius) {
             // 岩に押されて死んだ場合はメッセージを変える
-            game.gameOver(game.pushedByRock ? "岩に挟まれた" : "波にさらわれた");
+            game.gameOver(game.pushedByRockTimer > 0 ? "岩に挟まれた" : "波にさらわれた");
             return;
         }
 
@@ -126,8 +126,7 @@ export class Shrimp {
                             // 下り坂（右壁）
                             this.x += Math.max(push, 5);
                         }
-                        game.pushedByRock = true;
-                        this.vx *= -0.5; // 跳ね返る
+                        ghis.vx *= -0.5; // 跳ね返る
                     }
                 }
             }

@@ -41,6 +41,7 @@ export class Game {
         this.isSludgeZone = false;
         this.isIceZone = false;
         this.isSpaceZone = false;
+        this.isAscendZone = false; // 浮上ゾーン
         this.streamLines = []; // 激流のエフェクト
         this.lastBossDistance = 0;
         this.caughtNet = null; // 捕まっている網
@@ -138,6 +139,10 @@ export class Game {
             'ebi_achievements')) || [];
         this.itemsCollected = 0;
         this.treasureChestsCollected = 0;
+        this.pearlCollected = false;
+        this.clownfishCollected = false;
+        this.sessionAchievements = [];
+        this.currentRank = "";
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -363,6 +368,7 @@ export class Game {
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
         this.isKelpZone = false;
+        this.isAscendZone = false;
         this.kelpZoneTimer = 0;
         this.streamLines = [];
         this.backgroundObjects = [];
@@ -374,11 +380,15 @@ export class Game {
         this.currentRank = this.getRank(0);
         this.sessionAchievements = [];
         this.pushedByRock = false;
+        this.pearlCollected = false;
+        this.clownfishCollected = false;
         this.comboCount = 0;
         this.comboTimer = 0;
         this.isInvincibleMode = false;
         this.invincibleModeUsed = false;
         this.itemsCollected = 0;
+        this.pearlCollected = false;
+        this.clownfishCollected = false;
         this.treasureChestsCollected = 0;
         this.replaySystem.buffer = [];
         this.sound.startBGM();
@@ -503,6 +513,9 @@ export class Game {
             return "お散歩エビ";
         }
 
+        if (this.pearlCollected) return "真珠の発見者";
+        if (this.clownfishCollected) return "クマノミと友達";
+
         if (score < 100) return "迷子のエビ";
         if (score < 300) return "新米エビ";
         if (score < 500) return "冒険者";
@@ -588,10 +601,7 @@ export class Game {
             this.ctx.restore();
             this.gameOverResultURL = this.canvas.toDataURL(
                 'image/png');
-
-            // 3. 画面を元に戻す（再描画）
-            this.draw();
-
+            
             this.screenshotTaken = true;
         }
 
@@ -664,6 +674,7 @@ export class Game {
         this.score += 0.1; // 距離加算
         this.scrollOffset += this.scrollSpeed;
         this.uiScore.innerText = Math.floor(this.score);
+        if (!this.isAscendZone) this.pushedByRock = false; // フレームごとにリセット
 
         // ゾーン判定
         this.isSludgeZone = (this.score >= 3000 && this.score < 4000);
@@ -714,13 +725,10 @@ export class Game {
                         this.enemies.push(new Planet(this.width + 200, this.height / 2));
                     } else if (this.score >= 2000 && this.score < 3000) {
                         // 深海ボス
-                        this.enemies.push(new Architeuthis(
-                            this.width, this.height /
-                        2, this));
+                        this.enemies.push(new Architeuthis(this.width + 200, this.height / 2, this));
                     }
                     else {
-                        this.enemies.push(new Whale(this.width,
-                            this.height / 2));
+                        this.enemies.push(new Whale(this.width + 200, this.height / 2));
                     }
                 }
             }, 3000);
@@ -743,8 +751,7 @@ export class Game {
         this.kelpZoneTimer++;
         // 約20秒ごとに5秒間激流にする
         // 難易度が高いほど頻繁に
-        const rapidCurrentInterval = this.difficulty === 'HARD' ?
-            800 : 1200;
+        const rapidCurrentInterval = this.difficulty === 'HARD' ? 1000 : 1500;
         if (!this.isRapidCurrent && !this.isKelpZone && this.rapidCurrentTimer >
             rapidCurrentInterval) {
             if (Math.random() < 0.02) { // ランダム性を持たせる
@@ -766,7 +773,7 @@ export class Game {
 
             // プレイヤーが激流ゾーン（上下100px）にいるか判定
             const range = 100;
-            this.inRapidCurrentZone = Math.abs(this.player.y -
+            this.inRapidCurrentZone = !this.isAscendZone && Math.abs(this.player.y -
                 this.rapidCurrentY) < range;
 
             if (this.inRapidCurrentZone) {
@@ -805,6 +812,23 @@ export class Game {
                 0.8);
         }
 
+        // 浮上ゾーン
+        if (this.score > 5500 && !this.isAscendZone) {
+            this.isAscendZone = true;
+            this.addFloatingText(this.width / 2, this.height / 2, "浮上開始！", "#00FFFF");
+        }
+
+        if (this.isAscendZone) {
+            this.player.vy -= 0.05; // 上昇する力
+            this.scrollSpeed = Math.max(0.5, this.scrollSpeed * 0.995); // 徐々に減速
+            this.score -= 1.5; // 浮上してスコア（深度）が減る
+            if (this.frameCount % 3 === 0) {
+                // 浮上中は泡をたくさん出す
+                this.particles.push(new Bubble(this.player.x, this.player.y, false, true));
+            }
+            if (this.score <= 0) this.gameOver("生還！");
+        }
+
         if (this.state === STATE.CAUGHT) {
             // 捕獲中の処理
             if (this.caughtNet) {
@@ -821,25 +845,9 @@ export class Game {
                     this.escapeFromNet();
                 }
             }
-            // 左端判定（網ごと流されて死ぬ）
-            if (this.player.x < -this.player.radius) {
-                this.lives = 0;
-                const msg = this.inRapidCurrentZone ?
-                    "激流で網ごと彼方へ..." : "網に捕まったまま流された";
-                this.gameOver(msg);
-                return;
-            }
-        }
-        else {
-            // 通常プレイ中の処理
             this.player.update(this);
-            if (this.player.x < -this.player.radius) {
-                this.lives = 0;
-                const msg = this.inRapidCurrentZone ?
-                    "激流に飲み込まれ、藻屑と消えた..." : "波に飲まれた";
-                this.gameOver(msg);
-                return;
-            }
+        } else {
+            this.player.update(this);
         }
 
         // 敵生成と更新
@@ -854,11 +862,11 @@ export class Game {
             // クジラの吸い込み処理
             if (enemy instanceof Whale && enemy.isSucking) {
                 // プレイヤーへの吸引力
-                const dx = enemy.x - this.player.x;
+                const dx = (enemy.x - 150) - this.player.x; // 口の位置を左にずらす
                 const dy = (enemy.y + 30) - this.player.y; // 口の位置へ
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 600) { // 影響範囲
-                    const force = (600 - dist) / 600 * 2.0; // 近いほど強い
+                if (dist < 700 && dx > 0 && Math.abs(Math.atan2(dy, dx)) < Math.PI / 4) { // 前方90度範囲に狭める
+                    const force = (700 - dist) / 700 * 3.0; // 吸引力アップ
                     this.player.vx += (dx / dist) * force;
                     this.player.vy += (dy / dist) * force;
                     
@@ -988,6 +996,7 @@ export class Game {
                 this.itemsCollected++; // 実績用カウント
                 if (item instanceof Pearl) {
                     this.score += 50;
+                    this.pearlCollected = true;
                     this.addFloatingText(item.x, item.y, "+50",
                         "#FFD700");
                 }
@@ -1019,6 +1028,7 @@ export class Game {
                 }
                 else if (item instanceof Clownfish) {
                     this.score += 50;
+                    this.clownfishCollected = true;
                     this.addFloatingText(item.x, item.y, "+50",
                         "#FF4500");
                 }
@@ -1138,11 +1148,16 @@ export class Game {
         // スコアに応じて背景色を深海（暗く）にする演出
         const maxDepth = 2000; // 2000mで最も暗くなる
         const ratio = Math.min(this.score / maxDepth, 1);
-
+        
+        let ascendRatio = 0;
+        if (this.isAscendZone) {
+            ascendRatio = 1.0 - Math.max(0, this.score / 5500);
+        }
+        
         // #87CEEB (135, 206, 235) -> #001020 (0, 16, 32)
-        const r = Math.floor(135 * (1 - ratio) + 0 * ratio);
-        const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
-        const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
+        const r = Math.floor(135 * (1 - ratio) * (1 - ascendRatio) + 135 * ascendRatio);
+        const g = Math.floor(206 * (1 - ratio) * (1 - ascendRatio) + 206 * ascendRatio);
+        const b = Math.floor(235 * (1 - ratio) * (1 - ascendRatio) + 235 * ascendRatio);
 
         // 宇宙ゾーンの背景
         if (this.isSpaceZone) {
@@ -1240,11 +1255,16 @@ export class Game {
         if (this.score > 500) {
             const darknessStart = 500;
             const darknessEnd = 3000;
-            const maxDarkness = 0.95;
+            const maxDarkness = this.width < 600 ? 0.85 : 0.95; // スマホは少し明るく
             const ratio = Math.min(Math.max((this.score -
-                darknessStart) / (darknessEnd -
-                    darknessStart), 0), 1);
-            const darknessAlpha = ratio * maxDarkness;
+                darknessStart) / (darknessEnd - darknessStart), 0), 1);
+            
+            let darknessAlpha = ratio * maxDarkness;
+            if (this.isAscendZone) {
+                // 浮上中はスコアが減るにつれて暗闇が晴れていく
+                const ascendRatio = Math.max(0, this.score / 5500);
+                darknessAlpha *= ascendRatio;
+            }
 
             if (darknessAlpha > 0.01) {
                 const cx = this.player.x;

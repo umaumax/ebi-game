@@ -233,6 +233,12 @@ export class UIManager {
             badge.title = ach.title;
             badge.setAttribute('data-title', `${ach.title}\n${ach.description}`);
             this.badgeContainer.appendChild(badge);
+
+            // スマホ向けタップでツールチップ表示
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation(); // リトライイベントを発火させない
+                // ここでツールチップ表示のロジックを実装（例：カスタムツールチップUIを表示）
+            });
         });
 
         document.getElementById('replay-btn').style.display = this.game.replaySystem.buffer.length > 0 ? 'block' : 'none';

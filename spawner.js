@@ -62,28 +62,32 @@ export class Spawner {
             const rock = this.game.decorations.find(d => d instanceof RuggedTerrain &&
                 d.x > this.game.width - 100 && d.x < this.game.width +
                 200);
-
-            if (isDeep && Math.random() < 0.3) {
+            
+            const deepSpawnType = Math.random();
+            if (isDeep && deepSpawnType < 0.3) {
                 this.game.enemies.push(new Anglerfish(this.game.width, Math
                     .random() * (this.game.height - 100) + 50));
-            }
-            else if (rock && Math.random() < 0.5) {
+            } else if (isDeep && deepSpawnType < 0.6) {
+                // 深海でも平地を定期的に作る
+                this.game.enemies.push(new Flatfish(this.game.width, this.game.height - 40));
+            } else if (rock && Math.random() < 0.5) {
                 const pointIndex = Math.floor(Math.random() * (
                     rock.points.length - 2)) + 1;
                 const p = rock.points[pointIndex];
                 if (!p) return;
                 const enemyX = rock.x + p.x;
                 const enemyY = rock.y + p.y;
-                if (Math.random() < 0.5) {
-                    this.game.enemies.push(new SeaAnemone(enemyX,
-                        enemyY));
-                }
-                else {
-                    if (!isDeep) this.game.enemies.push(new Starfish(
-                        enemyX, enemyY));
-                    else this.game.enemies.push(new SeaUrchin(enemyX,
-                        enemyY - 15));
-                }
+                // 岩の中には配置しない
+                // if (Math.random() < 0.5) {
+                //     this.game.enemies.push(new SeaAnemone(enemyX,
+                //         enemyY));
+                // }
+                // else {
+                //     if (!isDeep) this.game.enemies.push(new Starfish(
+                //         enemyX, enemyY));
+                //     else this.game.enemies.push(new SeaUrchin(enemyX,
+                //         enemyY - 15));
+                // }
                 return;
             }
             else if (type < 0.20) {
@@ -148,9 +152,8 @@ export class Spawner {
                     Math.random() * (this.game.height - 100) +
                     50, this.game.player));
             }
-            else if (type < 0.97) {
-                this.game.enemies.push(new Whirlpool(this.game.width, Math.random() *
-                    80 + 40));
+            else if (type < 0.97 && this.game.score > 500) { // 500m以降に出現
+                this.game.enemies.push(new Whirlpool(this.game.width, 50)); // 上部固定で見やすく
             }
             else if (type < 0.98) {
                 this.game.enemies.push(new Flatfish(this.game.width, this.game.height -
@@ -159,6 +162,9 @@ export class Spawner {
             else if (type < 0.995) {
                 this.game.enemies.push(new Crab(this.game.width, this.game.getGroundY(
                     this.game.width)));
+            }
+            else if (this.game.score > 200 && Math.random() < 0.1) { // 通常ゾーンでも砂地を増やす
+                 this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, true)); // isSandy=true
             }
             else {
                 this.game.enemies.push(new SeaUrchin(this.game.width, this.game.height -
@@ -242,10 +248,13 @@ export class Spawner {
                         this.game.items.push(new GardenEel(this.game.width +
                             20, groundY));
                     }
-                }
-                else if (rand < (isDeep ? 0.8 : 0.9)) {
-                    this.game.decorations.push(new RuggedTerrain(this.game.width,
-                        this.game.height));
+                } else if (rand < (isDeep ? 0.7 : 0.9)) { // 深海での岩出現率を少し下げる
+                    // isSandyフラグを追加して、砂地か岩かを制御
+                    const isSandy = isDeep && Math.random() < 0.4; // 深海では40%の確率で砂地
+                    this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, isSandy));
+                } else if (isDeep) {
+                    // 深海ではサンゴの代わりに別のものを
+                    this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, true));
                 }
                 else if (!isDeep) {
                     this.game.decorations.push(new Coral(this.game.width,

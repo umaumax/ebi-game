@@ -149,10 +149,11 @@ export class Tuna extends Enemy {
     constructor(x, y) {
         super(x, y);
         this.radius = 25;
-        this.speed = 10.0; // とても速い
+        this.speed = 8.0; // 少し遅くした
     }
-    update(baseSpeed) {
-        this.x -= (baseSpeed + this.speed);
+    update(baseSpeed, game) {
+        const speedMultiplier = game.width < 600 ? 0.8 : 1.0; // スマホではさらに遅く
+        this.x -= (baseSpeed + this.speed * speedMultiplier);
     }
     draw(ctx) {
         // マグロ（クロマグロ）

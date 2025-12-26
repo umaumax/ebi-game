@@ -234,12 +234,9 @@ export class Plankton {
 export class FriendShrimp extends Plankton {
     constructor(x, y) {
         super(x, y);
-        this.radius = 25; // サイズを大きくして取りやすくする
+        this.radius = 50; // 当たり判定を大きくする
     }
     draw(ctx) {
-        // 描画用の固定サイズ（this.radiusはSpawnerでスケールされるため、描画には使わない）
-        const r = 15; // サイズを小さくする
-
         // 仲間エビ（主人公の後ろのエビのデザイン）
         ctx.save();
         ctx.translate(this.x, this.y);
@@ -248,7 +245,7 @@ export class FriendShrimp extends Plankton {
         ctx.scale(-1, 1);
 
         // 仲間の色（グラデーション）
-        const fGrad = ctx.createRadialGradient(0, -r * 0.2, 0, 0, 0, r);
+        const fGrad = ctx.createRadialGradient(0, -this.radius * 0.2, 0, 0, 0, this.radius);
         fGrad.addColorStop(0, '#FFC0CB');
         fGrad.addColorStop(1, '#FFB6C1');
         ctx.fillStyle = fGrad;
@@ -257,14 +254,14 @@ export class FriendShrimp extends Plankton {
 
         // 胴体
         ctx.beginPath();
-        ctx.ellipse(0, 0, r * 1.6, r * 0.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, this.radius * 1.6, this.radius * 0.6, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // 節（セグメント）の表現
         ctx.fillStyle = 'rgba(0,0,0,0.1)';
         for (let i = 0; i < 3; i++) {
             ctx.beginPath();
-            ctx.arc(-r * 0.5 + i * r * 0.5, -r * 0.2, r * 0.4, 0, Math.PI, false);
+            ctx.arc(-this.radius * 0.5 + i * this.radius * 0.5, -this.radius * 0.2, this.radius * 0.4, 0, Math.PI, false);
             ctx.fill();
         }
         ctx.fillStyle = baseStyle;
@@ -274,42 +271,42 @@ export class FriendShrimp extends Plankton {
         ctx.lineWidth = 2;
         for (let i = 0; i < 4; i++) {
             ctx.beginPath();
-            const x = -r * 0.5 + i * r * 0.4;
-            ctx.moveTo(x, r * 0.3);
-            ctx.lineTo(x - 2, r * 0.8);
+            const x = -this.radius * 0.5 + i * this.radius * 0.4;
+            ctx.moveTo(x, this.radius * 0.3);
+            ctx.lineTo(x - 2, this.radius * 0.8);
             ctx.stroke();
         }
 
         // 尻尾
         ctx.beginPath();
-        ctx.moveTo(-r, 0);
-        ctx.lineTo(-r * 1.75, r * 0.25);
-        ctx.lineTo(-r * 1.75, -r * 0.25);
+        ctx.moveTo(-this.radius, 0);
+        ctx.lineTo(-this.radius * 1.75, this.radius * 0.25);
+        ctx.lineTo(-this.radius * 1.75, -this.radius * 0.25);
         ctx.fill();
 
         // 長い触角
         ctx.strokeStyle = '#FF4500'; // 主人公と同じ濃いオレンジ
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(r, -5);
-        ctx.quadraticCurveTo(r + 20, -20, r + 10, -30);
-        ctx.moveTo(r, -5);
-        ctx.quadraticCurveTo(r + 25, -15, r + 15, -35);
+        ctx.moveTo(this.radius, -5);
+        ctx.quadraticCurveTo(this.radius + 20, -20, this.radius + 10, -30);
+        ctx.moveTo(this.radius, -5);
+        ctx.quadraticCurveTo(this.radius + 25, -15, this.radius + 15, -35);
         ctx.stroke();
 
         // 目（かわいさ重視）
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(r * 0.8, -5, 6, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.8, -5, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(r * 0.9, -5, 2, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.9, -5, 2, 0, Math.PI * 2);
         ctx.fill();
         // 目のハイライト
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(r * 0.9 - 1, -6, 1, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.9 - 1, -6, 1, 0, Math.PI * 2);
         ctx.fill();
 
         // 視認性向上のための発光エフェクト
@@ -320,10 +317,10 @@ export class FriendShrimp extends Plankton {
 
         // 体全体のアウトラインを描画
         ctx.beginPath();
-        ctx.ellipse(0, 0, r * 1.6, r * 0.6, 0, 0, Math.PI * 2);
-        ctx.moveTo(-r, 0);
-        ctx.lineTo(-r * 1.75, r * 0.25);
-        ctx.lineTo(-r * 1.75, -r * 0.25);
+        ctx.ellipse(0, 0, this.radius * 1.6, this.radius * 0.6, 0, 0, Math.PI * 2);
+        ctx.moveTo(-this.radius, 0);
+        ctx.lineTo(-this.radius * 1.75, this.radius * 0.25);
+        ctx.lineTo(-this.radius * 1.75, -this.radius * 0.25);
         ctx.closePath();
 
         ctx.stroke();
@@ -558,7 +555,7 @@ export class GardenEel {
         this.x = x;
         this.y = y;
         this.radius = 10;
-        this.height = 30;
+        this.height = 60; // 長さを伸ばす
     }
     update(speed) {
         this.x -= speed;
@@ -573,30 +570,34 @@ export class GardenEel {
             player.radius);
     }
     draw(ctx) {
+        const sway = Math.sin(Date.now() * 0.005 + this.x * 0.1) * 10;
+
         // チンアナゴ（白に黒点）
         ctx.fillStyle = '#F0F8FF'; // AliceBlue
         ctx.beginPath();
-        ctx.roundRect(this.x - 4, this.y - this.height, 8, this.height,
-            4);
+        ctx.moveTo(this.x - 4, this.y);
+        ctx.quadraticCurveTo(this.x - 4 + sway, this.y - this.height / 2, this.x - 4, this.y - this.height);
+        ctx.lineTo(this.x + 4, this.y - this.height);
+        ctx.quadraticCurveTo(this.x + 4 + sway, this.y - this.height / 2, this.x + 4, this.y);
         ctx.fill();
 
         // 黒点
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x, this.y - 20, 1.5, 0, Math.PI * 2);
-        ctx.arc(this.x, this.y - 10, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x + sway * 0.5, this.y - 40, 1.5, 0, Math.PI * 2);
+        ctx.arc(this.x + sway * 0.2, this.y - 20, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         // 目
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 2, this.y - 26, 1, 0, Math.PI * 2);
+        ctx.arc(this.x - 2, this.y - this.height + 4, 1, 0, Math.PI * 2);
         ctx.fill();
     }
 }
 
 export class Bubble {
-    constructor(x, y, isBackground = false) {
+    constructor(x, y, isBackground = false, isAscending = false) {
         this.x = x;
         this.y = y;
         this.size = Math.random() * 5 + 2;
@@ -613,6 +614,12 @@ export class Bubble {
             this.decay = 0.02;
             this.vy = 1;
             this.vxFactor = 0.5;
+        }
+
+        if (isAscending) {
+            this.vy = Math.random() * 2 + 2; // 上昇泡は速い
+            this.vxFactor = 0.2;
+            this.size = Math.random() * 3 + 1;
         }
     }
     update(speed) {

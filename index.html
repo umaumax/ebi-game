@@ -130,11 +130,11 @@
             h1 {
                 font-size: 24px;
             }
-            .message-box h1 {
-                font-size: 28px;
+            #gameover-screen h1 {
+                font-size: 24px;
             }
             .warning-msg {
-                font-size: 40px;
+                font-size: 32px;
             }
             .achievement-notification {
                 font-size: 14px;
@@ -443,7 +443,7 @@
         /* Gallery List */
         #gallery-list {
             position: absolute;
-            bottom: 150px;
+            bottom: 300px;
             left: 0;
             width: 100%;
             display: flex;
@@ -504,7 +504,7 @@
         <div id="start-screen" class="message-box">
             <h1>えびちゃん<span id="title-kari" style="cursor: pointer; color: #FF4500;">（仮）</span></h1>
             <p>泳ぐ：タップ / スペース</p>
-            <p>難易度を選んでスタート <span id="secret-trigger-ice"><span class="trigger-char" data-char="I">I</span><span class="trigger-char" data-char="C">C</span><span class="trigger-char" data-char="E">E</span></span></p>
+            <p>難易度を選んでスタート</p>
             <div class="difficulty-select">
                 <button id="btn-easy" class="diff-btn" style="background-color: #4CAF50;">EASY</button>
                 <button id="btn-normal" class="diff-btn" style="background-color: #2196F3;">NORMAL</button>
@@ -549,8 +549,8 @@
 
     <!-- Gallery UI -->
     <div id="gallery-ui" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 2000;">
+        <div id="gallery-list"></div>
         <div style="position:absolute; bottom:50px; width:100%; text-align:center; pointer-events:auto; background: rgba(0,0,0,0.5); padding: 20px 0;">
-            <div id="gallery-list"></div>
             <h2 id="gallery-name" style="color:white; text-shadow:2px 2px 0 #000; font-size:32px; margin:0 0 10px 0;">Name</h2>
             <p id="gallery-desc" style="color:#eee; text-shadow:1px 1px 0 #000; font-size:16px; margin:0 0 20px 0;">Description</p>
             <button id="gallery-prev" class="diff-btn" style="background-color:#555;">&lt;</button>

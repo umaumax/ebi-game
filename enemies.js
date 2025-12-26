@@ -1586,10 +1586,8 @@ class Architeuthis extends Enemy {
         if (this.attackTimer > 180) { // 3秒ごと（少し遅く）
             this.attackTimer = 0;
             // プレイヤーを狙う触手を生成
-            // 画面外（右下や右上）から伸びてくるイメージ
-            const targetY = game.player.y;
-            game.enemies.push(new GiantTentacle(this.x - 60, this
-                .y, targetY));
+            // 画面外（右下や右上）から伸びてくる
+            game.enemies.push(new GiantTentacle(this.x - 60, this.y, game));
         }
     }
     isOffScreen(w, h) {
@@ -1679,23 +1677,39 @@ class Architeuthis extends Enemy {
 }
 
 class GiantTentacle extends Enemy {
-    constructor(x, y, targetY) {
+    constructor(x, y, game) {
         super(x, y);
+        this.game = game;
         this.radius = 15;
-        this.targetY = targetY;
-        this.life = 100;
+        this.life = 120; // 寿命を少し長く
         this.length = 10;
         this.maxLength = 400;
-        this.angle = Math.atan2(targetY - y, -200); // 左方向へ伸ばす
+        
+        // 初期角度（プレイヤーの方向）
+        const dx = game.player.x - x;
+        const dy = game.player.y - y;
+        this.angle = Math.atan2(dy, dx);
     }
     update(speed) {
         this.x -= speed; // 本体と一緒に動く
-        if (this.life > 50) {
-            this.length += 15; // 伸びる
-            if (this.length > this.maxLength) this.length = this.maxLength;
+        if (this.life > 60) {
+            // 伸びるフェーズ（イージングで滑らかに）
+            this.length += (this.maxLength - this.length) * 0.1;
+            
+            // プレイヤーを追尾（角度を滑らかに更新）
+            const dx = this.game.player.x - this.x;
+            const dy = this.game.player.y - this.y;
+            const targetAngle = Math.atan2(dy, dx);
+            
+            // 角度の差分を計算して少しずつ近づける
+            let diff = targetAngle - this.angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            this.angle += diff * 0.05; // 追尾速度
         }
         else {
-            this.length -= 15; // 縮む
+            // 縮むフェーズ
+            this.length *= 0.85;
         }
         this.life--;
         if (this.life <= 0) this.markedForDeletion = true;

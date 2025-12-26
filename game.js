@@ -31,6 +31,14 @@ class Game {
         this.replayBuffer = []; // リプレイ用データ
         this.replayIndex = 0;
         this.replayDummies = {}; // リプレイ描画用のダミーインスタンス
+        this.isDraggingInGallery = false;
+        this.galleryDragStartX = 0;
+        this.galleryRotationAngle = 0;
+        this.galleryBaseAngle = 0;
+        this.galleryZoomLevel = 2.0;
+        this.galleryPinchStartDist = 0;
+        this.galleryItems = []; // 図鑑データ
+        this.currentGalleryIndex = 0;
         this.lastBossDistance = 0;
         this.caughtNet = null; // 捕まっている網
         this.escapeClicks = 0; // 脱出連打数
@@ -74,6 +82,12 @@ class Game {
         this.uiInvincibleUsedMsg = document.getElementById(
             'invincible-used-msg');
         this.uiTitleKari = document.getElementById('title-kari');
+        
+        // 図鑑UI
+        this.uiGallery = document.getElementById('gallery-ui');
+        this.uiGalleryName = document.getElementById('gallery-name');
+        this.uiGalleryDesc = document.getElementById('gallery-desc');
+        this.btnGallery = document.getElementById('btn-gallery');
 
         // ポーズ画面UI
         this.uiBgmSlider = document.getElementById('bgm-slider');
@@ -89,6 +103,7 @@ class Game {
 
         // リプレイ用ダミーの初期化
         this.initReplayDummies();
+        this.initGallery();
 
         // 難易度ボタン
         this.btnEasy = document.getElementById('btn-easy');
@@ -117,6 +132,28 @@ class Game {
         ['mousedown', 'touchstart'].forEach(evt => this.btnReplay
             .addEventListener(evt, replayHandler));
 
+        // 図鑑ボタン
+        const galleryHandler = (e) => { e.stopPropagation(); this.startGallery(); };
+        ['mousedown', 'touchstart'].forEach(evt => this.btnGallery
+            .addEventListener(evt, galleryHandler));
+
+        // 図鑑操作ボタン
+        document.getElementById('gallery-prev').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.currentGalleryIndex = (this.currentGalleryIndex - 1 + this.galleryItems.length) % this.galleryItems.length;
+            this.updateGalleryUI();
+            this.sound.playItem();
+        });
+        document.getElementById('gallery-next').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.currentGalleryIndex = (this.currentGalleryIndex + 1) % this.galleryItems.length;
+            this.updateGalleryUI();
+            this.sound.playItem();
+        });
+        document.getElementById('gallery-back').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.endGallery();
+        });
         // スキップボタン
         const skipReplayHandler = (e) => {
             e.stopPropagation();
@@ -325,6 +362,8 @@ class Game {
                     cls.name] = new cls(0, 0, this);
                 else if (cls === Architeuthis) this.replayDummies[
                     cls.name] = new cls(0, 0, this);
+                else if (cls === GiantTentacle) this.replayDummies[
+                    cls.name] = new cls(0, 0, this);
                 else this.replayDummies[cls.name] = new cls(
                     0, 0);
             }
@@ -334,6 +373,61 @@ class Game {
             }
         });
         this.replayDummies['Shrimp'] = new Shrimp(0, 0);
+    }
+
+    initGallery() {
+        this.galleryItems = [
+            { cls: Shrimp, name: "えびちゃん", desc: "家に帰りたい健気なエビ。\nジャンプ力には自信がある。" },
+            { cls: FriendShrimp, name: "仲間エビ", desc: "はぐれた仲間。\n助けるとライフが増える。" },
+            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。\n群れるのが好き。" },
+            { cls: Sardine, name: "イワシ", desc: "集団で泳ぐ小魚。\n一匹なら怖くない。" },
+            { cls: Tuna, name: "マグロ", desc: "高速で泳ぐ海の弾丸。\n止まると死ぬらしい。" },
+            { cls: Shark, name: "サメ", desc: "海のハンター。\n執拗に追いかけてくる。" },
+            { cls: Anglerfish, name: "チョウチンアンコウ", desc: "深海の誘惑者。\n光に近づいてはいけない。" },
+            { cls: Squid, name: "イカ", desc: "気まぐれに泳ぐ軟体動物。\nたまにダッシュする。" },
+            { cls: Octopus, name: "タコ", desc: "くねくね動く。\n深海では寝ていることも。" },
+            { cls: Flatfish, name: "ヒラメ", desc: "海底に潜む罠。\n踏むと食べられる。" },
+            { cls: SeaUrchin, name: "ウニ", desc: "触ると痛い。\n海底の地雷。" },
+            { cls: Jellyfish, name: "クラゲ", desc: "電気を帯びている。\n触れると痺れる。" },
+            { cls: Porcupinefish, name: "ハリセンボン", desc: "怒ると針を飛ばす。\n普段はかわいい。" },
+            { cls: ElectricEel, name: "電気ウナギ", desc: "強力な電気を放つ。\nS字に泳ぐ。" },
+            { cls: MorayEel, name: "ウツボ", desc: "岩陰から狙っている。\n噛まれると痛い。" },
+            { cls: Crab, name: "カニ", desc: "横歩きの達人。\nハサミは強力。" },
+            { cls: SeaAnemone, name: "イソギンチャク", desc: "綺麗な花には毒がある。\n触手注意。" },
+            { cls: Starfish, name: "ヒトデ", desc: "星形の生物。\n張り付かれると厄介。" },
+            { cls: Penguin, name: "ペンギン", desc: "氷の海の住人。\n水中では飛ぶように泳ぐ。" },
+            { cls: Seal, name: "アザラシ", desc: "愛らしい見た目だが\nぶつかると重い。" },
+            { cls: Walrus, name: "セイウチ", desc: "立派な牙を持つ。\n氷の海の主。" },
+            { cls: Whale, name: "クジラ", desc: "巨大な海の王者。\n吸い込み攻撃に注意。" },
+            { cls: Architeuthis, name: "ダイオウイカ", desc: "深海の伝説。\n巨大な触手で襲いかかる。" },
+            { cls: Hook, name: "釣り針", desc: "地上からの魔の手。\n引っかかると連れ去られる。" },
+            { cls: Net, name: "底引き網", desc: "根こそぎ持っていく。\n連打で逃げろ！" },
+            { cls: Trash, name: "ゴミ", desc: "人間が捨てたゴミ。\n海を汚さないで。" },
+            { cls: Meteor, name: "隕石", desc: "宇宙からの来訪者。\n当たると痛いでは済まない。" },
+            { cls: SpaceDebris, name: "スペースデブリ", desc: "宇宙のゴミ。\n高速で飛んでくる。" },
+            { cls: Planet, name: "惑星", desc: "宇宙の彼方にある星。\n衝突注意。" }
+        ];
+    }
+
+    startGallery() {
+        this.state = STATE.GALLERY;
+        this.screenStart.style.display = 'none';
+        this.uiGallery.style.display = 'block';
+        this.galleryZoomLevel = 2.0; // ズームレベルをリセット
+        this.galleryRotationAngle = 0; // 図鑑を開くたびに角度をリセット
+        this.updateGalleryUI();
+    }
+
+    endGallery() {
+        this.state = STATE.START;
+        this.screenStart.style.display = 'block';
+        this.uiGallery.style.display = 'none';
+    }
+
+    updateGalleryUI() {
+        const item = this.galleryItems[this.currentGalleryIndex];
+        this.uiGalleryName.innerText = item.name;
+        this.uiGalleryDesc.innerText = item.desc;
     }
 
     resize() {
@@ -460,6 +554,68 @@ class Game {
                 }
             }
         };
+
+        // 図鑑でのドラッグ回転
+        const galleryDragStart = (e) => {
+            if (this.state !== STATE.GALLERY) return;
+            this.isDraggingInGallery = true;
+            this.galleryDragStartX = e.clientX || e.touches[0].clientX;
+            this.galleryBaseAngle = this.galleryRotationAngle;
+        };
+        const galleryDragEnd = () => {
+            this.isDraggingInGallery = false;
+            this.galleryPinchStartDist = 0;
+        };
+
+        // マウスホイールでのズーム
+        this.canvas.addEventListener('wheel', (e) => {
+            if (this.state !== STATE.GALLERY) return;
+            e.preventDefault();
+            this.galleryZoomLevel *= 1 - e.deltaY * 0.001;
+            this.galleryZoomLevel = Math.max(0.5, Math.min(this.galleryZoomLevel, 10.0));
+        }, { passive: false });
+
+        this.canvas.addEventListener('mousedown', galleryDragStart);
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (!this.isDraggingInGallery) return;
+            const currentX = e.clientX;
+            const dx = currentX - this.galleryDragStartX;
+            this.galleryRotationAngle = this.galleryBaseAngle + dx * 0.01; // 回転感度
+        });
+        this.canvas.addEventListener('mouseup', galleryDragEnd);
+        this.canvas.addEventListener('mouseleave', galleryDragEnd);
+
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (this.state === STATE.GALLERY) {
+                e.preventDefault();
+                if (e.touches.length === 2) { // ピンチ開始
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    this.galleryPinchStartDist = Math.sqrt(dx * dx + dy * dy);
+                    this.isDraggingInGallery = false; // ピンチ中は回転させない
+                } else if (e.touches.length === 1) { // ドラッグ開始
+                    galleryDragStart(e);
+                }
+            }
+        }, { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (this.state === STATE.GALLERY) {
+                e.preventDefault();
+                if (e.touches.length === 2 && this.galleryPinchStartDist > 0) { // ピンチ中
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    this.galleryZoomLevel *= dist / this.galleryPinchStartDist;
+                    this.galleryZoomLevel = Math.max(0.5, Math.min(this.galleryZoomLevel, 10.0));
+                    this.galleryPinchStartDist = dist;
+                } else if (e.touches.length === 1 && this.isDraggingInGallery) { // ドラッグ中
+                    const currentX = e.touches[0].clientX;
+                    const dx = currentX - this.galleryDragStartX;
+                    this.galleryRotationAngle = this.galleryBaseAngle + dx * 0.01;
+                }
+            }
+        }, { passive: false });
+        this.canvas.addEventListener('touchend', galleryDragEnd);
 
         window.addEventListener('keydown', action);
         window.addEventListener('touchstart', action,
@@ -1178,6 +1334,11 @@ class Game {
     }
 
     update() {
+        if (this.state === STATE.GALLERY) {
+            this.frameCount++; // アニメーション用
+            return;
+        }
+
         if (this.state === STATE.REPLAY) {
             this.replayIndex++;
             if (this.replayIndex >= this.replayBuffer.length) {
@@ -1647,6 +1808,11 @@ class Game {
     }
 
     draw() {
+        if (this.state === STATE.GALLERY) {
+            this.drawGallery();
+            return;
+        }
+
         if (this.state === STATE.REPLAY) {
             this.drawReplay();
             return;
@@ -1866,6 +2032,1614 @@ class Game {
             this.ctx.fillStyle = '#FF4500';
             this.ctx.fillRect(this.player.x - barW / 2, this.player.y -
                 40, barW * progress, 8);
+            this.ctx.restore();
+        }
+    }
+
+    drawGallery() {
+        // 背景（少し暗く）
+        this.ctx.fillStyle = '#203040';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // グリッド線
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        this.ctx.lineWidth = 1;
+        const gridSize = 50;
+        this.ctx.beginPath();
+        for(let x=0; x<this.width; x+=gridSize) {
+            this.ctx.moveTo(x, 0); this.ctx.lineTo(x, this.height);
+        }
+        for(let y=0; y<this.height; y+=gridSize) {
+            this.ctx.moveTo(0, y); this.ctx.lineTo(this.width, y);
+        }
+        this.ctx.stroke();
+
+        const item = this.galleryItems[this.currentGalleryIndex];
+        const cls = item.cls;
+        const dummy = this.replayDummies[cls.name];
+
+        if (dummy) {
+            this.ctx.save();
+            // 画面中央に配置
+            this.ctx.translate(this.width / 2, this.height / 2 - 50);
+            // ズームレベルを適用（最小0.5倍、最大10倍）
+            this.galleryZoomLevel = Math.max(0.5, Math.min(this.galleryZoomLevel, 10.0));
+            this.ctx.scale(this.galleryZoomLevel, this.galleryZoomLevel);
+            // ドラッグで回転
+            this.ctx.rotate(this.galleryRotationAngle);
+
+            // 座標をリセットして描画
+            dummy.x = 0;
+            dummy.y = 0;
+            // アニメーション用パラメータ更新（簡易的）
+            if (dummy.timer !== undefined) dummy.timer += 0.05;
+            if (dummy.moveTimer !== undefined) dummy.moveTimer += 0.1;
+
+            dummy.draw(this.ctx, this.frameCount);
+            this.ctx.restore();
+        }
+    }
+
+    drawReplay() {
+        const snapshot = this.replayBuffer[this.replayIndex];
+        if (!snapshot) return;
+
+        // 背景描画（共通処理の一部再利用）
+        const maxDepth = 2000;
+        const ratio = Math.min(snapshot.score / maxDepth, 1);
+        const r = Math.floor(135 * (1 - ratio) + 0 * ratio);
+        const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
+        const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+        gradient.addColorStop(0,
+            `rgb(${Math.min(255, r + 30)},${Math.min(255, g + 30)},${Math.min(255, b + 30)})`
+        );
+        gradient.addColorStop(1, `rgb(${r},${g},${b})`);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // 地面
+        this.ctx.fillStyle = '#E0C090';
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.height);
+        // 地面のうねりはscrollOffsetに依存するため、snapshotの値を使用
+        const getGroundY = (x) => {
+            const base = this.height - 50;
+            return base + Math.sin((x + snapshot.scrollOffset) *
+                0.005) * 20 + Math.sin((x + snapshot.scrollOffset) *
+                    0.02) * 10;
+        };
+        for (let x = 0; x <= this.width; x += 10) {
+            this.ctx.lineTo(x, getGroundY(x));
+        }
+        this.ctx.lineTo(this.width, this.height);
+        this.ctx.fill();
+
+        // 背景オブジェクト描画（リプレイ）
+        // snapshot.objectsに含まれているので、通常のオブジェクト描画ループで処理されるはずだが、
+        // 描画順序を守るために、typeでフィルタリングして先に描画するのが理想。
+        // 簡易的に、背景オブジェクトクラスなら先に描画するようにソートするか、2回ループする。
+
+        // 背景オブジェクトのみ先に描画
+        snapshot.objects.forEach(data => {
+            if (data.type === 'Shipwreck') {
+                const dummy = this.replayDummies[data.type];
+                if (dummy) {
+                    Object.assign(dummy, data);
+                    dummy.draw(this.ctx, this.frameCount);
+                }
+            }
+        });
+
+        // オブジェクト描画
+        snapshot.objects.forEach(data => {
+            if (data.type === 'Shipwreck') return; // 描画済み
+            const dummy = this.replayDummies[data.type];
+            if (dummy) {
+                Object.assign(dummy, data); // プロパティをコピー
+                dummy.draw(this.ctx, this.frameCount); // frameCountはアニメーション用だが、リプレイでは進行し続ける値で代用
+            }
+        });
+
+        // プレイヤー描画
+        const pData = snapshot.player;
+        const pDummy = this.replayDummies['Shrimp'];
+        Object.assign(pDummy, pData);
+
+        // 仲間エビの描画（履歴から復元）
+        // リプレイバッファ自体を履歴として使う
+        const followerCount = Math.max(0, pData.lives - 1);
+
+        for (let i = 1; i <= followerCount; i++) {
+            // 2フレームに1回記録しているので、遅延フレーム数(8) / 2 = 4インデックス前を参照
+            const delayIdx = i * 4;
+            const prevSnapshot = this.replayBuffer[this.replayIndex -
+                delayIdx];
+            if (prevSnapshot) pDummy.drawFollower(this.ctx,
+                prevSnapshot.player);
+        }
+        // 本体描画
+        Object.assign(pDummy, pData); // 戻す
+        pDummy.draw(this.ctx, pData.lives, snapshot.decorations.map(d =>
+            Object.assign(this.replayDummies[d.type], d)));
+
+        // 深海モード（リプレイ）
+        if (snapshot.score > 500) {
+            const darknessStart = 500;
+            const darknessEnd = 3000;
+            
+            if (this.state === STATE.GALLERY) {
+                e.preventDefault();
+                galleryDragStart(e);
+            }
+        }
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (this.state === STATE.GALLERY) {
+                e.preventDefault();
+                galleryDragMove(e);
+            }
+        }, { passive: false });
+        this.canvas.addEventListener('touchend', galleryDragEnd);
+
+        window.addEventListener('keydown', action);
+        window.addEventListener('touchstart', action,
+            {
+                passive: false
+            });
+        window.addEventListener('mousedown', action);
+    }
+
+    togglePause() {
+        if (this.state === STATE.PLAYING) {
+            this.state = STATE.PAUSED;
+            this.screenPause.style.display = 'block';
+            this.uiPauseBtn.style.display = 'none';
+            this.uiInvincibleToggle.style.opacity = this.isInvincibleMode ?
+                '1.0' : '0.5';
+            this.sound.stopBGM();
+        }
+        else if (this.state === STATE.PAUSED) {
+            this.state = STATE.PLAYING;
+            this.screenPause.style.display = 'none';
+            this.uiPauseBtn.style.display = 'flex';
+            this.sound.startBGM();
+        }
+    }
+
+    startGame(difficulty = 'NORMAL', startScore = 0) {
+        this.difficulty = difficulty;
+        this.state = STATE.PLAYING;
+        this.screenStart.style.display = 'none';
+        this.screenGameOver.style.display = 'none';
+        this.score = 0;
+        this.lives = 3;
+        this.updateLifeDisplay();
+        this.level = Math.floor(startScore / 100);
+
+        // 初期化時にリサイズ処理を呼んでパラメータを確定させる
+        this.resize();
+
+        // スタート地点に合わせて前回のボス位置を調整（すぐにボスが出るように）
+        this.lastBossDistance = Math.floor(startScore / CONSTANTS
+            .BOSS_INTERVAL) * CONSTANTS.BOSS_INTERVAL;
+        this.uiWarning.classList.remove('active');
+        this.frameCount = 0;
+        this.scrollOffset = 0;
+        this.isRapidCurrent = false;
+        this.rapidCurrentTimer = 0;
+        this.isKelpZone = false;
+        this.kelpZoneTimer = 0;
+        this.streamLines = [];
+        this.backgroundObjects = [];
+        this.screenshotTaken = false;
+        this.caughtNet = null;
+        this.escapeClicks = 0;
+
+        this.damageTaken = false;
+        this.currentRank = this.getRank(0);
+        this.sessionAchievements = [];
+        this.pushedByRock = false;
+        this.comboCount = 0;
+        this.comboTimer = 0;
+        this.isInvincibleMode = false;
+        this.invincibleModeUsed = false;
+        this.itemsCollected = 0;
+        this.replayBuffer = [];
+        this.sound.startBGM();
+        this.enemies = [];
+        this.items = [];
+        this.decorations = [];
+        this.particles = [];
+        this.floatingTexts = [];
+        // スマホ向け調整: 画面が狭い場合はプレイヤーを左側に寄せて反応時間を稼ぐ
+        const startX = this.width < 600 ? this.width * 0.15 :
+            this.width / 3;
+        this.player.reset(startX, this.height / 2);
+        this.updatePlayerSize();
+
+        // 深海スタートの場合
+        if (startScore > 0) {
+            this.score = startScore;
+            this.addFloatingText(this.player.x, this.player.y -
+                50, "DEEP SEA MODE!", "#FF00FF");
+        }
+    }
+
+    resetGame() {
+        this.state = STATE.START;
+        this.screenStart.style.display = 'block';
+        this.screenGameOver.style.display = 'none';
+        this.sound.stopBGM();
+    }
+
+    startReplay() {
+        this.state = STATE.REPLAY;
+        this.screenGameOver.style.display = 'none';
+        this.uiReplay.style.display = 'block';
+        // 最後の3秒間だけ再生 (30fps * 3s = 90フレーム)
+        this.replayIndex = Math.max(0, this.replayBuffer.length -
+            90);
+    }
+
+    updateLifeDisplay() {
+        let hearts = '';
+        for (let i = 0; i < this.lives; i++) hearts += '❤';
+        this.uiLife.innerText = hearts;
+    }
+
+    updatePlayerSize() {
+        // ライフが増えるとサイズ（当たり判定）が大きくなる仕様
+        // ライフ3を基準(20px)とし、増減でサイズ変化
+        if (this.player) {
+            const base = CONSTANTS.SHRIMP_BASE_SIZE * this.scaleFactor;
+            const size = base + (this.lives - 3) * 5 * this.scaleFactor;
+            this.player.radius = Math.max(10, size); // 最小10pxは確保
+        }
+    }
+
+    hitPlayer(reason = "不明") {
+        if (this.player.isInvincible || this.isInvincibleMode)
+            return;
+
+        this.sound.playHit();
+        this.lives--;
+        this.updateLifeDisplay();
+        this.updatePlayerSize();
+        this.damageTaken = true;
+        this.deathReason = reason;
+
+        if (this.lives <= 0) {
+            this.gameOver(reason);
+        }
+        else {
+            // ダメージ演出と無敵時間
+            this.player.setInvincible(60); // 60フレーム無敵
+            // 画面を赤くフラッシュさせるなどの演出も可
+            this.ctx.fillStyle = 'rgba(255,0,0,0.3)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+        }
+    }
+
+    catchPlayer(net) {
+        if (this.player.isInvincible || this.isInvincibleMode)
+            return;
+        this.state = STATE.CAUGHT;
+        this.caughtNet = net;
+        this.escapeClicks = 0;
+        this.requiredClicks = 3; // 連打回数設定（5回から3回へ緩和）
+        this.addFloatingText(this.player.x, this.player.y - 40,
+            "連打で逃げろ！", "#FF4500");
+    }
+
+    escapeFromNet() {
+        this.state = STATE.PLAYING;
+        this.player.setInvincible(60); // 無敵時間付与
+        this.player.jump(); // ジャンプして復帰
+        if (this.caughtNet) {
+            this.caughtNet.markedForDeletion = true; // 網を消す
+            // 破片エフェクトなどを出しても良い
+        }
+        this.caughtNet = null;
+        this.addFloatingText(this.player.x, this.player.y, "脱出！",
+            "#FFFFFF");
+        this.sound.playJump();
+    }
+
+    triggerFlatfishDeath(flatfish) {
+        // ヒラメに食べられる演出開始
+        if (this.isInvincibleMode) return;
+        this.sound.playHit();
+        this.state = STATE.BITTEN;
+        this.bittenTimer = 0;
+        this.killerEnemy = flatfish;
+        // プレイヤーをヒラメの位置に固定（捕食された表現）
+        this.player.x = flatfish.x;
+        this.player.y = flatfish.y;
+        this.deathReason = "ヒラメに食べられた";
+    }
+
+    getGroundY(x) {
+        const base = this.height - 50;
+        // うねうねさせる
+        return base + Math.sin((x + this.scrollOffset) * 0.005) *
+            20 + Math.sin((x + this.scrollOffset) * 0.02) * 10;
+    }
+
+    addFloatingText(x, y, text, color) {
+        this.floatingTexts.push(new FloatingText(x, y, text,
+            color));
+    }
+
+    getRank(score) {
+        if (score < 100) return "迷子のエビ";
+        if (score < 300) return "お散歩エビ";
+        if (score < 500) return "冒険者";
+        if (score < 1000) return "深海の旅人";
+        if (score < 2000) return "深淵を覗く者";
+        if (score < 3000) return "深海の主";
+        if (score < 5000) return "伝説の海老";
+        return "深海の覇者";
+    }
+
+    showNotification(icon, text) {
+        this.uiAchievementText.innerText = `${icon} ${text}`;
+        this.uiAchievement.classList.add('show');
+        setTimeout(() => this.uiAchievement.classList.remove(
+            'show'), 3000);
+        this.sound.playItem();
+    }
+
+    checkAchievements() {
+        this.achievements.forEach(ach => {
+            if (!this.unlockedAchievements.includes(ach.id)) {
+                if (ach.condition(this)) {
+                    this.unlockedAchievements.push(ach.id);
+                    localStorage.setItem(
+                        'ebi_achievements', JSON.stringify(
+                            this.unlockedAchievements
+                        ));
+                    this.showNotification(ach.icon,
+                        `実績解除！\n${ach.title}`);
+                }
+            }
+            // セッション内で解除した実績を記録
+            if (ach.condition(this) && !this.sessionAchievements
+                .includes(ach.id)) {
+                this.sessionAchievements.push(ach.id);
+            }
+        });
+    }
+
+    gameOver(reason) {
+        if (reason) this.deathReason = reason;
+        this.state = STATE.GAMEOVER;
+        this.screenGameOver.style.display = 'block';
+
+        // ゲームオーバーUIを描画した状態のCanvasを保存
+        if (!this.screenshotTaken) {
+            // 1. 文字なし（プレビュー用）を保存
+            this.gameOverScreenshotURL = this.canvas.toDataURL(
+                'image/png');
+
+            // 2. 文字あり（ダウンロード用）を生成して保存
+            this.ctx.save();
+
+            // 半透明の黒背景を重ねて文字を見やすく
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+
+            this.ctx.fillStyle = '#FF4500';
+            this.ctx.font = 'bold 48px "M PLUS Rounded 1c"';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.shadowColor = 'white';
+            this.ctx.shadowBlur = 10;
+            this.ctx.fillText("GAME OVER", this.width / 2, this.height /
+                2 - 80);
+            this.ctx.shadowBlur = 0;
+
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 32px "M PLUS Rounded 1c"';
+            this.ctx.fillText(`記録: ${Math.floor(this.score)}m`,
+                this.width / 2, this.height / 2);
+
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+            this.ctx.fillText(`称号: ${this.getRank(this.score)}`,
+                this.width / 2, this.height / 2 + 40);
+
+            this.ctx.fillStyle = '#FF6F61';
+            this.ctx.font = 'bold 20px "M PLUS Rounded 1c"';
+            this.ctx.fillText(`死因: ${reason || this.deathReason}`,
+                this.width / 2, this.height / 2 + 80);
+
+            this.ctx.restore();
+            this.gameOverResultURL = this.canvas.toDataURL(
+                'image/png');
+
+            // 3. 画面を元に戻す（再描画）
+            this.draw();
+
+            this.screenshotTaken = true;
+        }
+
+        // スクリーンショット生成
+        document.getElementById('screenshot').src = this.gameOverScreenshotURL;
+
+        this.sound.stopBGM();
+        this.uiReplay.style.display = 'none'; // スキップボタンを隠す
+        this.uiFinalScore.innerText = Math.floor(this.score);
+        this.uiRank.innerText = `称号: ${this.getRank(this.score)}`;
+        this.uiDeathReason.innerText = reason || this.deathReason;
+        this.uiInvincibleUsedMsg.style.display = this.invincibleModeUsed ?
+            'block' : 'none';
+
+        // バッジ表示
+        this.uiBadgeContainer.innerHTML = '';
+        this.achievements.forEach(ach => {
+            const badge = document.createElement('div');
+            const isUnlocked = this.unlockedAchievements.includes(
+                ach.id);
+            const isNew = this.sessionAchievements.includes(
+                ach.id);
+            badge.className =
+                `badge ${isUnlocked ? '' : 'locked'} ${isNew ? 'new' : ''}`;
+            badge.innerText = ach.icon;
+            badge.title = ach.title; // ツールチップ用
+            // スマホ等でタップした時に名前が見えるようにdata属性もセット
+            badge.setAttribute('data-title',
+                `${ach.title}\n${ach.description}`);
+            this.uiBadgeContainer.appendChild(badge);
+        });
+
+        // リプレイボタンの表示制御（データがある場合のみ）
+        if (this.replayBuffer.length > 0) {
+            this.btnReplay.style.display = 'block';
+        }
+        else {
+            this.btnReplay.style.display = 'none';
+        }
+
+        if (this.score > this.highScore) {
+            this.highScore = Math.floor(this.score);
+            localStorage.setItem('ebi_highscore', this.highScore);
+            this.uiHighScore.innerText = this.highScore;
+        }
+        this.frameCount = 0; // リスタート待ち時間用
+    }
+
+    spawnEnemy() {
+        // ボス出現中は雑魚敵を出さない
+        if (this.uiWarning.classList.contains('active') || this.enemies
+            .some(e => e instanceof Whale || e instanceof Architeuthis)
+        ) {
+            return;
+        }
+
+        // 難易度調整: 時間経過で出現頻度が上がる
+        // 距離が進むにつれて障害物の隙間を狭くする（出現頻度アップ）
+        let baseRate = 90;
+        let minRate = 25;
+
+        if (this.difficulty === 'EASY') {
+            baseRate = 100;
+            minRate = 35;
+        }
+        else if (this.difficulty === 'HARD') {
+            baseRate = 45;
+            minRate = 12;
+        }
+        else {
+            baseRate = 70;
+            minRate = 20;
+        }
+
+        // スマホ調整: 画面が狭い場合は出現頻度を少し下げる
+        if (this.width < 600) {
+            baseRate = Math.floor(baseRate * 1.2);
+            minRate = Math.floor(minRate * 1.2);
+        }
+
+        const spawnRate = Math.max(minRate, baseRate - Math.floor(
+            this.score / 25));
+
+        if (this.frameCount % spawnRate === 0) {
+            const type = Math.random();
+            const isDeep = this.score > 1000; // 1000m超えたら深海
+            const isVeryDeep = this.score > 2000;
+
+            // ゾーンごとの敵生成
+            if (this.isSludgeZone) return this.spawnSludgeEnemies();
+            if (this.isIceZone) return this.spawnIceEnemies();
+
+            if (this.isSpaceZone) {
+                this.spawnSpaceEnemies();
+                return;
+            }
+
+            // 岩の上に敵を配置できるかチェック
+            // 画面右端付近にある岩を探す
+            const rock = this.decorations.find(d => d instanceof RuggedTerrain &&
+                d.x > this.width - 100 && d.x < this.width +
+                200);
+
+            // 深海なら一定確率で提灯鮟鱇
+            if (isDeep && Math.random() < 0.3) {
+                this.enemies.push(new Anglerfish(this.width, Math
+                    .random() * (this.height - 100) + 50));
+            }
+            else if (rock && Math.random() < 0.5) {
+                // 岩がある場合は高確率で岩の上に敵を配置
+                // 岩の上のランダムな頂点を選択
+                const pointIndex = Math.floor(Math.random() * (
+                    rock.points.length - 2)) + 1;
+                const p = rock.points[pointIndex];
+                if (!p) return; // 安全策
+                const enemyX = rock.x + p.x;
+                const enemyY = rock.y + p.y;
+                if (Math.random() < 0.5) {
+                    this.enemies.push(new SeaAnemone(enemyX,
+                        enemyY));
+                }
+                else {
+                    if (!isDeep) this.enemies.push(new Starfish(
+                        enemyX, enemyY));
+                    else this.enemies.push(new SeaUrchin(enemyX,
+                        enemyY - 15));
+                }
+                return; // 岩の上に配置したら他の敵は出さない
+            }
+            else if (type < 0.20) {
+                // 魚 (20%)
+                if (!isDeep) this.enemies.push(new Fish(this.width,
+                    Math.random() * (this.height - 100) +
+                    50));
+                else this.enemies.push(new Flatfish(this.width,
+                    this.height - 40)); // 深海ではヒラメ
+            }
+            else if (type < 0.35) {
+                // イワシの群れ (15%)
+                if (!isDeep) {
+                    const baseY = Math.random() * (this.height -
+                        150) + 50;
+                    const count = Math.floor(Math.random() * 6) +
+                        10; // 10~15匹
+                    for (let i = 0; i < count; i++) {
+                        this.enemies.push(new Sardine(this.width +
+                            Math.random() * 200, baseY +
+                            Math.random() * 80 - 40));
+                    }
+                }
+                else {
+                    this.enemies.push(new SeaUrchin(this.width,
+                        this.height - 65)); // 深海ではウニ
+                }
+            }
+            else if (type < 0.45) {
+                // マグロ (10%) - 直進高速
+                this.enemies.push(new Tuna(this.width, Math.random() *
+                    (this.height - 100) + 50));
+            }
+            else if (type < 0.50) {
+                // サメ (5%) - ホーミング
+                this.enemies.push(new Shark(this.width, Math.random() *
+                    (this.height - 100) + 50, this.player
+                ));
+            }
+            else if (type < 0.60 && !isDeep) {
+                // 網 (10%)
+                this.enemies.push(new Net(this.width + 100, Math.random() *
+                    (this.height - 200) + 100));
+            }
+            else if (type < 0.70 && !isDeep) {
+                // 釣り針 (10%)
+                this.enemies.push(new Hook(this.width, -100));
+            }
+            else if (type < 0.80) {
+                // イカ (10%)
+                this.enemies.push(new Squid(this.width, Math.random() *
+                    (this.height - 200) + 100));
+            }
+            else if (type < 0.85) {
+                // クラゲ (5%) - 新規
+                this.enemies.push(new Jellyfish(this.width, Math.random() *
+                    (this.height - 150) + 50));
+            }
+            else if (type < 0.90) {
+                // タコ (5%)
+                this.enemies.push(new Octopus(this.width, Math.random() *
+                    (this.height - 200) + 100));
+            }
+            else if (type < 0.93) {
+                // ハリセンボン (5%) - 新規
+                this.enemies.push(new Porcupinefish(this.width,
+                    Math.random() * (this.height - 100) +
+                    50, this));
+            }
+            else if (type < 0.95 && isDeep) {
+                // 電気ウナギ (2%) - 新規
+                this.enemies.push(new ElectricEel(this.width,
+                    Math.random() * (this.height - 100) +
+                    50, this.player));
+            }
+            else if (type < 0.97) {
+                // うずしお (3%) - 画面上部に出現
+                this.enemies.push(new Whirlpool(this.width, Math.random() *
+                    80 + 40));
+            }
+            else if (type < 0.98) {
+                // 潜む魚 (3%) - 海底に出現
+                this.enemies.push(new Flatfish(this.width, this.height -
+                    40));
+            }
+            else if (type < 0.995) {
+                // カニ (2%) - 海底を歩く
+                this.enemies.push(new Crab(this.width, this.getGroundY(
+                    this.width)));
+            }
+            else {
+                // うに (2%) - 海底に配置
+                this.enemies.push(new SeaUrchin(this.width, this.height -
+                    65));
+            }
+
+            // 生成した敵のサイズを画面サイズに合わせて調整
+            const enemy = this.enemies[this.enemies.length - 1];
+            if (enemy) {
+                enemy.radius *= this.scaleFactor;
+            }
+        }
+    }
+
+    spawnSludgeEnemies() {
+        if (this.frameCount % 60 === 0) {
+            const r = Math.random();
+            if (r < 0.6) {
+                this.enemies.push(new Trash(this.width, Math.random() * (this.height - 100) + 50));
+            } else if (r < 0.9) {
+                // ウツボ（岩陰などから出るイメージだが、ここではランダム配置）
+                this.enemies.push(new MorayEel(this.width, Math.random() * (this.height - 150) + 100));
+            } else {
+                // 視界が悪いので光る敵も少し出す
+                this.enemies.push(new Jellyfish(this.width, Math.random() * (this.height - 100) + 50));
+            }
+        }
+    }
+
+    spawnIceEnemies() {
+        if (this.frameCount % 70 === 0) {
+            const r = Math.random();
+            if (r < 0.4) {
+                this.enemies.push(new Penguin(this.width, Math.random() * (this.height / 2)));
+            } else if (r < 0.7) {
+                this.enemies.push(new Seal(this.width, Math.random() * (this.height - 100) + 50));
+            } else if (r < 0.9) {
+                this.enemies.push(new Walrus(this.width, Math.random() * (this.height - 150) + 100));
+            } else {
+                // 流氷（障害物）
+                this.enemies.push(new IceFloe(this.width, 0)); // 上部に配置
+            }
+        }
+    }
+
+    spawnSpaceEnemies() {
+        if (this.frameCount % 50 === 0) {
+            if (Math.random() < 0.7) {
+                this.enemies.push(new Meteor(this.width, Math.random() *
+                    this.height));
+            }
+            else {
+                this.enemies.push(new SpaceDebris(this.width,
+                    Math.random() * this.height));
+            }
+        }
+        if (this.score > 5500 && !this.enemies.some(e => e instanceof Planet)) {
+            this.enemies.push(new Planet(this.width + 200, this.height /
+                2));
+        }
+    }
+
+    showLevelUp() {
+        this.uiLevelUp.classList.remove('animate');
+        // Trigger reflow
+        void this.uiLevelUp.offsetWidth;
+        this.uiLevelUp.classList.add('animate');
+    }
+
+    spawnDecorations() {
+        const groundY = this.getGroundY(this.width);
+        const isDeep = this.score > 1000;
+
+        if (this.isSpaceZone) {
+            if (this.frameCount % 100 === 0) this.backgroundObjects
+                .push(new Satellite(this.width, Math.random() *
+                    this.height));
+            return;
+        }
+
+        // 海底の装飾 (わかめ、岩、サンゴ)
+        if (this.frameCount % 30 === 0) {
+            // 昆布ゾーンでは昆布を大量発生
+            if (this.isKelpZone) {
+                if (Math.random() < 0.8) this.decorations.push(
+                    new Seaweed(this.width, groundY));
+            }
+            else if (Math.random() < 0.8) { // 20%は何も出ない砂地ゾーン
+                const rand = Math.random();
+                // 深海ではワカメやサンゴは出ない
+                if (rand < 0.5 && !isDeep) {
+                    this.decorations.push(new Seaweed(this.width,
+                        groundY));
+                    // わかめに混じってチンアナゴ
+                    if (Math.random() < 0.1) {
+                        this.items.push(new GardenEel(this.width +
+                            20, groundY));
+                    }
+                }
+                else if (rand < (isDeep ? 0.8 : 0.9)) { // 深海では岩が出やすい
+                    this.decorations.push(new RuggedTerrain(this.width,
+                        this.height));
+                }
+                else if (!isDeep) {
+                    this.decorations.push(new Coral(this.width,
+                        groundY));
+                    // サンゴ礁にカクレクマノミ
+                    if (Math.random() < 0.5) {
+                        this.items.push(new Clownfish(this.width,
+                            this.height - 80));
+                    }
+                }
+            }
+        }
+        // パール (たまに)
+        if (this.frameCount % 300 === 0) {
+            // 海底に配置
+            this.items.push(new Pearl(this.width, groundY - 15));
+        }
+        // プランクトン (頻繁に)
+        if (this.frameCount % 100 === 0) {
+            this.items.push(new Plankton(this.width, Math.random() *
+                (this.height - 100) + 50));
+        }
+        // 仲間エビ (レア)
+        if (this.frameCount % 600 === 0) {
+            this.items.push(new FriendShrimp(this.width, Math.random() *
+                (this.height - 100) + 50));
+        }
+
+        // 生成したアイテムのサイズ調整
+        const item = this.items[this.items.length - 1];
+        if (item) item.radius *= this.scaleFactor;
+    }
+
+    scatterItems(x, y) {
+        // 大量のパール（重力で落ちる）
+        for (let k = 0; k < 8; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            const p = new Pearl(x, y, Math.cos(angle) * speed,
+                Math.sin(angle) * speed);
+            p.radius *= this.scaleFactor;
+            this.items.push(p);
+        }
+        // 大量のプランクトン（ふわふわ広がる）
+        for (let k = 0; k < 15; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            const p = new Plankton(x, y, Math.cos(angle) * speed,
+                Math.sin(angle) * speed);
+            p.radius *= this.scaleFactor;
+            this.items.push(p);
+        }
+    }
+
+    recordState() {
+        // 2フレームに1回記録
+        if (this.frameCount % 2 !== 0) return;
+
+        const snapshot = {
+            player:
+            {
+                x: this.player.x,
+                y: this.player.y,
+                angle: this.player.angle,
+                isBending: this.player.isBending,
+                lives: this.lives
+            },
+            scrollOffset: this.scrollOffset,
+            score: this.score,
+            objects: [],
+            decorations: [] // 岩の判定用に別途保存
+        };
+
+        // 描画に必要なオブジェクトの状態を保存
+        const saveObj = (obj) => {
+            const data = {
+                type: obj.constructor.name,
+                x: obj.x,
+                y: obj.y,
+                // 各クラス固有の描画パラメータ
+                angle: obj.angle,
+                timer: obj.timer,
+                moveTimer: obj.moveTimer,
+                hasExploded: obj.hasExploded,
+                width: obj.width,
+                height: obj.height, // Rock, Seaweed
+                color: obj.color, // Rock, Coral
+                branches: obj.branches, // Coral
+                life: obj.life,
+                size: obj.size,
+                isBackground: obj.isBackground, // Bubble
+                length: obj.length // StreamLine
+            };
+            snapshot.objects.push(data);
+        };
+
+        this.decorations.forEach(saveObj);
+        this.backgroundObjects.forEach(saveObj);
+        this.items.forEach(saveObj);
+        this.enemies.forEach(saveObj);
+        this.particles.forEach(saveObj);
+        this.streamLines.forEach(saveObj);
+        snapshot.decorations = this.decorations.map(d => (
+            {
+                type: d.constructor.name,
+                x: d.x,
+                y: d.y,
+                width: d.width,
+                height: d.height
+            }));
+
+        this.replayBuffer.push(snapshot);
+        // バッファ制限（約10秒分 = 30fps * 10s = 300フレーム）
+        if (this.replayBuffer.length > 300) {
+            this.replayBuffer.shift();
+        }
+    }
+
+    update() {
+        if (this.state === STATE.GALLERY) {
+            this.frameCount++; // アニメーション用
+            return;
+        }
+
+        if (this.state === STATE.REPLAY) {
+            this.replayIndex++;
+            if (this.replayIndex >= this.replayBuffer.length) {
+                // リプレイ終了
+                this.gameOver(this.deathReason);
+            }
+            return;
+        }
+
+        if (this.state !== STATE.PLAYING && this.state !== STATE.CAUGHT) {
+            if (this.state === STATE.GAMEOVER) this.frameCount++;
+            return;
+        }
+
+        this.frameCount++;
+        this.score += 0.1; // 距離加算
+        this.scrollOffset += this.scrollSpeed;
+        this.uiScore.innerText = Math.floor(this.score);
+
+        // ゾーン判定
+        this.isSludgeZone = (this.score >= 3000 && this.score < 4000);
+        this.isIceZone = (this.score >= 4000 && this.score < 5000);
+        this.isSpaceZone = (this.score >= 5000);
+
+        // コンボタイマー更新
+        if (this.comboTimer > 0) {
+            this.comboTimer--;
+        }
+        else if (this.comboCount > 0) {
+            this.comboCount = 0;
+        }
+        // コンボ表示更新
+        this.uiComboDisplay.innerText = this.comboCount > 1 ?
+            `${this.comboCount} COMBO!` : '';
+        this.uiComboDisplay.classList.toggle('show', this.comboCount >
+            1);
+
+        // 状態記録（リプレイ用）
+        this.recordState();
+
+        // BGMパラメータ更新
+        this.sound.setBGMParams(this.score, this.inRapidCurrentZone);
+
+        // 実績チェック
+        this.checkAchievements();
+
+        // ランクアップチェック
+        const newRank = this.getRank(this.score);
+        if (newRank !== this.currentRank) {
+            this.currentRank = newRank;
+            this.showNotification('👑', `ランクアップ！\n${newRank}`);
+        }
+
+        // ボス出現判定
+        if (this.score - this.lastBossDistance >= CONSTANTS.BOSS_INTERVAL) {
+            this.lastBossDistance = Math.floor(this.score);
+            // 警告表示
+            this.uiWarning.classList.add('active');
+
+            // 3秒後にボス出現
+            setTimeout(() => {
+                this.uiWarning.classList.remove('active');
+                if (this.state === STATE.PLAYING) {
+                    // ゾーンボス分岐
+                    if (this.isSpaceZone) {
+                        this.enemies.push(new Planet(this.width + 200, this.height / 2));
+                    } else if (this.score >= 2000 && this.score < 3000) {
+                        // 深海ボス
+                        this.enemies.push(new Architeuthis(
+                            this.width, this.height /
+                        2, this));
+                    }
+                    else {
+                        this.enemies.push(new Whale(this.width,
+                            this.height / 2));
+                    }
+                }
+            }, 3000);
+        }
+
+        // ヒラメ演出中は更新停止（演出用タイマーのみ動かす）
+        if (this.state === STATE.BITTEN) return;
+
+        // レベルアップ判定 (100mごと)
+        const currentLevel = Math.floor(this.score / 100);
+        if (currentLevel > this.level) {
+            this.level = currentLevel;
+            this.uiLevel.innerText = this.level + 1;
+            this.scrollSpeed += 0.5; // 速度アップ
+            this.showLevelUp();
+        }
+
+        // 激流ゾーンの制御
+        this.rapidCurrentTimer++; // タイマーは常に進める
+        this.kelpZoneTimer++;
+        // 約20秒ごとに5秒間激流にする
+        // 難易度が高いほど頻繁に
+        const rapidCurrentInterval = this.difficulty === 'HARD' ?
+            800 : 1200;
+        if (!this.isRapidCurrent && !this.isKelpZone && this.rapidCurrentTimer >
+            rapidCurrentInterval) {
+            if (Math.random() < 0.02) { // ランダム性を持たせる
+                this.isRapidCurrent = true;
+                this.rapidCurrentTimer = 0;
+                // 激流の高さを決定 (画面の20%〜80%の範囲)
+                this.rapidCurrentY = this.height * 0.2 + Math.random() *
+                    (this.height * 0.6);
+                this.addFloatingText(this.width / 2, this.rapidCurrentY,
+                    "激流注意！", "#FF4500");
+            }
+        }
+        else if (this.isRapidCurrent) {
+            if (this.rapidCurrentTimer > 300) {
+                this.isRapidCurrent = false;
+                this.inRapidCurrentZone = false;
+                this.rapidCurrentTimer = 0;
+            }
+
+            // プレイヤーが激流ゾーン（上下100px）にいるか判定
+            const range = 100;
+            this.inRapidCurrentZone = Math.abs(this.player.y -
+                this.rapidCurrentY) < range;
+
+            if (this.inRapidCurrentZone) {
+                this.player.vx -= 0.8; // 流される力をさらに強く
+                // 激流音（頻度アップ・音量アップ）
+                if (this.frameCount % 4 === 0) this.sound.playNoise(
+                    0.25);
+            }
+            else {
+                // ゾーン外でも少し音はする
+                if (this.frameCount % 20 === 0) this.sound.playNoise(
+                    0.05);
+            }
+        }
+
+        // 昆布ゾーン（低速）の制御
+        const kelpZoneInterval = 1000;
+        if (!this.isKelpZone && !this.isRapidCurrent && this.kelpZoneTimer >
+            kelpZoneInterval) {
+            if (Math.random() < 0.02) {
+                this.isKelpZone = true;
+                this.kelpZoneTimer = 0;
+                this.addFloatingText(this.width / 2, this.height /
+                    2, "昆布の森", "#2E8B57");
+            }
+        }
+        else if (this.isKelpZone) {
+            if (this.kelpZoneTimer > 400) { // 持続時間
+                this.isKelpZone = false;
+                this.kelpZoneTimer = 0;
+            }
+            // プレイヤーの動きに抵抗をかける
+            this.player.vx *= 0.95;
+            // スクロール速度を落とす（ただし最低速度は保証）
+            this.scrollSpeed = Math.max(1.0, this.scrollSpeed *
+                0.8);
+        }
+
+        if (this.state === STATE.CAUGHT) {
+            // 捕獲中の処理
+            if (this.caughtNet) {
+                // プレイヤーを網の位置に拘束
+                this.player.x = this.caughtNet.x;
+                this.player.y = this.caughtNet.y;
+
+                // 暴れる演出（回転とバタつき）
+                this.player.angle = (Math.random() - 0.5) * 0.8;
+                this.player.isBending = (this.frameCount % 8 < 4);
+
+                // 網が消滅していたら復帰（安全策）
+                if (this.caughtNet.markedForDeletion) {
+                    this.escapeFromNet();
+                }
+            }
+            // 左端判定（網ごと流されて死ぬ）
+            if (this.player.x < -this.player.radius) {
+                this.lives = 0;
+                const msg = this.inRapidCurrentZone ?
+                    "激流で網ごと彼方へ..." : "網に捕まったまま流された";
+                this.gameOver(msg);
+                return;
+            }
+        }
+        else {
+            // 通常プレイ中の処理
+            this.player.update(this);
+            if (this.player.x < -this.player.radius) {
+                this.lives = 0;
+                const msg = this.inRapidCurrentZone ?
+                    "激流に飲み込まれ、藻屑と消えた..." : "波に飲まれた";
+                this.gameOver(msg);
+                return;
+            }
+        }
+
+        // 敵生成と更新
+        this.spawnEnemy();
+        this.spawnBackgroundObjects();
+        this.spawnDecorations();
+
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            const enemy = this.enemies[i];
+            enemy.update(this.scrollSpeed, this); // Hookのためにthis(game)を渡す
+
+            // クジラの吸い込み処理
+            if (enemy instanceof Whale && enemy.isSucking) {
+                // プレイヤーへの吸引力
+                const dx = enemy.x - this.player.x;
+                const dy = (enemy.y + 30) - this.player.y; // 口の位置へ
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 600) { // 影響範囲
+                    const force = (600 - dist) / 600 * 2.0; // 近いほど強い
+                    this.player.vx += (dx / dist) * force;
+                    this.player.vy += (dy / dist) * force;
+                    
+                    // ザコ敵も吸い込む
+                    this.enemies.forEach(other => {
+                        if (other !== enemy && !(other instanceof Whale)) {
+                            other.x += (enemy.x - other.x) * 0.05;
+                            other.y += ((enemy.y + 30) - other.y) * 0.05;
+                            // 口に入ったら消える
+                            if (Math.abs(other.x - enemy.x) < 50 && Math.abs(other.y - (enemy.y + 30)) < 50) {
+                                other.markedForDeletion = true;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 激流に流される処理
+            if (this.isRapidCurrent && Math.abs(enemy.y - this.rapidCurrentY) <
+                100) {
+                enemy.x -= 5.0; // 敵も流される
+            }
+
+            // 削除フラグが立っている敵を削除
+            if (enemy.markedForDeletion) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
+
+            // 安全策: 座標がNaNになった敵は削除（フリーズ防止）
+            if (!isFinite(enemy.x) || !isFinite(enemy.y)) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
+
+            // 画面外判定
+            if (enemy.isOffScreen(this.width, this.height)) {
+                this.enemies.splice(i, 1);
+                continue;
+            }
+
+            // 当たり判定
+            if (this.state === STATE.PLAYING && enemy.checkCollision(
+                this.player)) {
+                if (enemy instanceof Flatfish) {
+                    // ヒラメは即死演出
+                    this.triggerFlatfishDeath(enemy);
+                }
+                else {
+                    let reason = "敵にぶつかった";
+                    if (enemy instanceof Fish) reason = "魚にぶつかった";
+                    else if (enemy instanceof Sardine) reason =
+                        "イワシの群れに巻き込まれた";
+                    else if (enemy instanceof Tuna) reason =
+                        "マグロに激突された";
+                    else if (enemy instanceof Hook) reason =
+                        "釣り針に引っかかった";
+                    else if (enemy instanceof Anglerfish) reason =
+                        "提灯鮟鱇に食べられた";
+                    else if (enemy instanceof Shark) reason =
+                        "サメに噛まれた";
+                    else if (enemy instanceof Net) {
+                        this.catchPlayer(enemy);
+                        continue; // 捕獲処理へ
+                    }
+                    else if (enemy instanceof Squid) reason =
+                        "イカにぶつかった";
+                    else if (enemy instanceof Octopus) reason =
+                        "タコに捕まった";
+                    else if (enemy instanceof Jellyfish) reason =
+                        "クラゲに刺された";
+                    else if (enemy instanceof Porcupinefish ||
+                        enemy instanceof Needle) reason =
+                            "ハリセンボンの針が刺さった";
+                    else if (enemy instanceof Whirlpool) reason =
+                        "うずしおに巻き込まれた";
+                    else if (enemy instanceof Whale) reason =
+                        enemy.isSucking ? "クジラに吸い込まれた" : "巨大クジラに衝突した";
+                    else if (enemy instanceof WaterSpout || enemy instanceof WaterDrop)
+                        reason = "クジラの潮吹きにやられた";
+                    else if (enemy instanceof Architeuthis ||
+                        enemy instanceof GiantTentacle) reason =
+                            "ダイオウイカに捕食された";
+                    else if (enemy instanceof SeaUrchin) reason =
+                        "うにに刺さった";
+                    else if (enemy instanceof Crab) reason =
+                        "カニに挟まれた";
+                    else if (enemy instanceof SeaAnemone) reason =
+                        "イソギンチャクに刺された";
+                    else if (enemy instanceof Starfish) reason =
+                        "ヒトデに張り付かれた";
+                    else if (enemy instanceof ElectricEel) reason =
+                        "電気ウナギに感電した";
+                    else if (enemy instanceof Trash) reason = "ゴミにぶつかった";
+                    else if (enemy instanceof MorayEel) reason = "ウツボに噛まれた";
+                    else if (enemy instanceof Penguin) reason = "ペンギンと衝突した";
+                    else if (enemy instanceof Seal || enemy instanceof Walrus) reason = "海獣にぶつかった";
+                    else if (enemy instanceof Meteor || enemy instanceof SpaceDebris) reason = "宇宙の藻屑となった";
+                    else if (enemy instanceof Planet) reason = "惑星に衝突した";
+
+                    if (this.inRapidCurrentZone) {
+                        reason = "激流で回避不能！" + reason;
+                    }
+                    this.hitPlayer(reason);
+                }
+            }
+        }
+
+        // アイテム更新
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            const item = this.items[i];
+            item.update(this.scrollSpeed, this); // gameを渡す
+
+            // 安全策
+            if (!isFinite(item.x) || !isFinite(item.y)) {
+                this.items.splice(i, 1);
+                continue;
+            }
+
+            if (item.isOffScreen(this.width, this.height)) {
+                this.items.splice(i, 1);
+                continue;
+            }
+
+            if (item.checkCollision(this.player)) {
+                this.sound.playItem();
+                this.itemsCollected++; // 実績用カウント
+                if (item instanceof Pearl) {
+                    this.score += 50;
+                    this.addFloatingText(item.x, item.y, "+50",
+                        "#FFD700");
+                }
+                else if (item instanceof TreasureChest) {
+                    this.score += 500;
+                    this.addFloatingText(item.x, item.y, "+500",
+                        "#FFD700");
+                }
+                else if (item instanceof FriendShrimp) { // Planktonより先に判定する
+                    if (this.lives < CONSTANTS.MAX_LIVES) {
+                        this.lives++;
+                        this.updateLifeDisplay();
+                        this.updatePlayerSize();
+                        this.addFloatingText(item.x, item.y,
+                            "1UP!", "#FF69B4");
+                    }
+                    else {
+                        // ライフ満タンならスコアボーナス
+                        this.score += 100;
+                        this.addFloatingText(item.x, item.y,
+                            "+100", "#FFD700");
+                    }
+                }
+                else if (item instanceof Plankton) {
+                    this.score += 10;
+                    this.addFloatingText(item.x, item.y, "+10",
+                        "#90EE90");
+                }
+                else if (item instanceof Clownfish) {
+                    this.score += 50;
+                    this.addFloatingText(item.x, item.y, "+50",
+                        "#FF4500");
+                }
+                else if (item instanceof GardenEel) {
+                    this.score += 30;
+                    this.addFloatingText(item.x, item.y, "+30",
+                        "#FFFFFF");
+                }
+                this.items.splice(i, 1);
+            }
+        }
+
+        // 装飾更新
+        for (let i = this.decorations.length - 1; i >= 0; i--) {
+            const deco = this.decorations[i];
+            deco.update(this.scrollSpeed, this);
+
+            // 画面外判定修正: 岩などが完全に消えてから削除
+            const offscreenX = deco.width ? deco.x + deco.width :
+                deco.x;
+            if (offscreenX < 0) this.decorations.splice(i, 1);
+
+            // 岩の当たり判定はShrimp.updateに移動
+        }
+
+        // 背景オブジェクト更新
+        for (let i = this.backgroundObjects.length - 1; i >= 0; i--) {
+            const obj = this.backgroundObjects[i];
+            obj.update(this.scrollSpeed);
+            if (obj.x < -300) this.backgroundObjects.splice(i, 1);
+        }
+
+        // 激流エフェクト（ストリームライン）
+        if (this.isRapidCurrent && this.frameCount % 2 === 0) {
+            // 激流の高さ周辺に生成
+            const y = this.rapidCurrentY + (Math.random() - 0.5) *
+                200;
+            this.streamLines.push(new StreamLine(this.width, y));
+        }
+        for (let i = this.streamLines.length - 1; i >= 0; i--) {
+            // 激流時はスクロールも速く見えるように
+            this.streamLines[i].update(this.scrollSpeed + 10);
+            if (this.streamLines[i].x < -200) this.streamLines.splice(
+                i, 1);
+        }
+
+        // パーティクル（泡）
+        if (this.frameCount % 20 === 0) {
+            this.particles.push(new Bubble(this.player.x, this.player
+                .y));
+            if (Math.random() < 0.05) this.sound.playBubble(); // たまに音を鳴らす
+        }
+
+        // 背景の泡（スコアに応じて増える演出）
+        // 深度(score)に応じて発生確率と数を上げる
+        const bubbleDensity = Math.min(20, Math.floor(this.score /
+            300));
+        if (this.frameCount % 15 === 0) {
+            // 基本確率 + スコアボーナス
+            if (Math.random() < 0.2 + (bubbleDensity * 0.05)) {
+                // 画面下部からランダムに発生
+                this.particles.push(new Bubble(Math.random() * (
+                    this.width + 100), this.height +
+                10, true));
+            }
+        }
+
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            this.particles[i].update(this.scrollSpeed);
+            if (this.particles[i].life <= 0) this.particles.splice(
+                i, 1);
+        }
+
+        // フローティングテキスト更新
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            this.floatingTexts[i].update();
+            if (this.floatingTexts[i].life <= 0) this.floatingTexts
+                .splice(i, 1);
+        }
+    }
+
+    spawnBackgroundObjects() {
+        // 沈没船 (たまに)
+        // 深海（スコア1000以上）でのみ出現
+        if (this.score > 1000 && this.frameCount % 1200 === 0) {
+            const x = this.width;
+            const y = this.height - 50;
+            this.backgroundObjects.push(new Shipwreck(x, y));
+            // 宝箱を沈没船の近く（海底）に配置
+            const chest = new TreasureChest(x + 100, this.getGroundY(
+                x + 100));
+            chest.radius *= this.scaleFactor;
+            this.items.push(chest);
+        }
+    }
+
+    draw() {
+        if (this.state === STATE.GALLERY) {
+            this.drawGallery();
+            return;
+        }
+
+        if (this.state === STATE.REPLAY) {
+            this.drawReplay();
+            return;
+        }
+
+        // ヒラメ捕食演出中の描画
+        if (this.state === STATE.BITTEN) {
+            this.bittenTimer++;
+
+            // 画面シェイク演出
+            const shakeX = (Math.random() - 0.5) * 20;
+            const shakeY = (Math.random() - 0.5) * 20;
+            this.ctx.save();
+            this.ctx.translate(shakeX, shakeY);
+
+            // 背景などはそのまま
+            // ヒラメを描画（口を閉じるアニメーションなど）
+            this.killerEnemy.draw(this.ctx, true); // true = 捕食中
+
+            this.ctx.restore();
+
+            // 一定時間後にゲームオーバー
+            if (this.bittenTimer > 60) {
+                this.gameOver();
+            }
+            return;
+        }
+
+        // 背景クリア
+        // スコアに応じて背景色を深海（暗く）にする演出
+        const maxDepth = 2000; // 2000mで最も暗くなる
+        const ratio = Math.min(this.score / maxDepth, 1);
+
+        // #87CEEB (135, 206, 235) -> #001020 (0, 16, 32)
+        const r = Math.floor(135 * (1 - ratio) + 0 * ratio);
+        const g = Math.floor(206 * (1 - ratio) + 16 * ratio);
+        const b = Math.floor(235 * (1 - ratio) + 32 * ratio);
+
+        // 宇宙ゾーンの背景
+        if (this.isSpaceZone) {
+            this.ctx.fillStyle = '#0B0B3B';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            // 星を描画
+            this.ctx.fillStyle = 'white';
+            for(let i=0; i<50; i++) {
+                const sx = (this.frameCount * 0.5 + i * 137) % this.width;
+                const sy = (i * 93) % this.height;
+                const size = (i % 3) + 1;
+                this.ctx.fillRect(sx, sy, size, size);
+            }
+        } else {
+
+        // 背景グラデーション (上から光が差し込む表現)
+        const gradient = this.ctx.createLinearGradient(0, 0, 0,
+            this.height);
+        gradient.addColorStop(0,
+            `rgb(${Math.min(255, r + 30)},${Math.min(255, g + 30)},${Math.min(255, b + 30)})`
+        );
+        gradient.addColorStop(1, `rgb(${r},${g},${b})`);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        }
+
+        // 背景オブジェクト描画（地面より奥）
+        this.backgroundObjects.forEach(o => o.draw(this.ctx));
+
+        // 海底の描画（砂）
+        // うねうねさせる
+        this.ctx.fillStyle = '#E0C090'; // 砂っぽい色
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.height);
+        for (let x = 0; x <= this.width; x += 10) {
+            this.ctx.lineTo(x, this.getGroundY(x));
+        }
+        this.ctx.lineTo(this.width, this.height);
+        this.ctx.fill();
+
+        // 激流エフェクト描画
+        this.streamLines.forEach(l => l.draw(this.ctx));
+        if (this.isRapidCurrent) {
+            // 激流ゾーンを可視化（薄い帯）
+            const grad = this.ctx.createLinearGradient(0, this.rapidCurrentY -
+                100, 0, this.rapidCurrentY + 100);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            this.ctx.fillStyle = grad;
+            this.ctx.fillRect(0, this.rapidCurrentY - 100, this.width,
+                200);
+        }
+
+        // 昆布ゾーンエフェクト
+        if (this.isKelpZone) {
+            this.ctx.fillStyle = 'rgba(46, 139, 87, 0.1)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+        }
+
+        // アイテム描画
+        this.items.forEach(i => {
+            this.ctx.save();
+            this.ctx.translate(i.x, i.y);
+            this.ctx.scale(this.scaleFactor, this.scaleFactor);
+            this.ctx.translate(-i.x, -i.y);
+            i.draw(this.ctx);
+            this.ctx.restore();
+        });
+
+        // フローティングテキスト描画
+        this.floatingTexts.forEach(t => t.draw(this.ctx));
+
+        // パーティクル描画
+        this.particles.forEach(p => p.draw(this.ctx));
+
+        // 敵描画
+        this.enemies.forEach(e => {
+            this.ctx.save();
+            this.ctx.translate(e.x, e.y);
+            this.ctx.scale(this.scaleFactor, this.scaleFactor);
+            this.ctx.translate(-e.x, -e.y);
+            e.draw(this.ctx);
+            this.ctx.restore();
+        });
+
+        // 装飾描画
+        this.decorations.forEach(d => d.draw(this.ctx, this.frameCount));
+
+        // プレイヤー描画
+        this.player.draw(this.ctx, this.lives, this.decorations);
+
+        // 深海モード（暗闇演出）
+        // スコア500mから徐々に暗くなり、プレイヤーの周りだけ明るくする
+        if (this.score > 500) {
+            const darknessStart = 500;
+            const darknessEnd = 3000;
+            const maxDarkness = 0.95;
+            const ratio = Math.min(Math.max((this.score -
+                darknessStart) / (darknessEnd -
+                    darknessStart), 0), 1);
+            const darknessAlpha = ratio * maxDarkness;
+
+            if (darknessAlpha > 0.01) {
+                const cx = this.player.x;
+                const cy = this.player.y;
+                const lightRadius = 120; // 明るい範囲
+                const fadeRadius = lightRadius + (this.width <
+                    600 ? 200 : 400); // グラデーションの広がり
+
+                const grad = this.ctx.createRadialGradient(cx, cy,
+                    lightRadius, cx, cy, fadeRadius);
+                grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                grad.addColorStop(1,
+                    `rgba(0, 0, 0, ${darknessAlpha})`);
+
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.width, this.height);
+            }
+        }
+
+        // ヘドロゾーン：視界不良（ヘドロオーバーレイ）
+        if (this.isSludgeZone) {
+            // 汚い緑のオーバーレイ
+            this.ctx.fillStyle = 'rgba(85, 107, 47, 0.4)';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            // 浮遊物（ゴミ）
+            this.ctx.fillStyle = 'rgba(50, 50, 0, 0.2)';
+            for(let i=0; i<20; i++) {
+                const dx = (this.frameCount + i * 50) % this.width;
+                const dy = (i * 40) % this.height;
+                this.ctx.fillRect(dx, dy, 4, 4);
+            }
+        }
+
+        // 流氷ゾーン：上部に氷
+        if (this.isIceZone) {
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.fillRect(0, 0, this.width, 60); // 上部の氷
+        }
+
+        // 捕獲中のUI描画
+        if (this.state === STATE.CAUGHT || (this.state === STATE.GAMEOVER &&
+            this.caughtNet)) {
+            // プレイヤーの上に網を描画して「捕まっている感」を出す
+            this.ctx.save();
+            this.ctx.translate(this.player.x, this.player.y);
+
+            // 円形でクリッピング
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, this.player.radius + 8, 0, Math.PI * 2);
+            this.ctx.clip();
+
+            this.ctx.strokeStyle = 'rgba(80, 50, 20, 0.9)';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            const r = this.player.radius + 10;
+            for (let i = -r; i <= r; i += 8) {
+                this.ctx.moveTo(i, -r);
+                this.ctx.lineTo(i, r);
+                this.ctx.moveTo(-r, i);
+                this.ctx.lineTo(r, i);
+            }
+            this.ctx.stroke();
+            this.ctx.restore();
+
+        }
+        if (this.state === STATE.CAUGHT) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText("連打!!", this.player.x, this.player.y - 50);
+            // ゲージ
+            const barW = 60;
+            const progress = Math.min(1.0, this.escapeClicks / this.requiredClicks);
+            this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            this.ctx.fillRect(this.player.x - barW / 2, this.player.y -
+                40, barW, 8);
+            this.ctx.fillStyle = '#FF4500';
+            this.ctx.fillRect(this.player.x - barW / 2, this.player.y -
+                40, barW * progress, 8);
+            this.ctx.restore();
+        }
+    }
+
+    drawGallery() {
+        // 背景（少し暗く）
+        this.ctx.fillStyle = '#203040';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // グリッド線
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        this.ctx.lineWidth = 1;
+        const gridSize = 50;
+        this.ctx.beginPath();
+        for(let x=0; x<this.width; x+=gridSize) {
+            this.ctx.moveTo(x, 0); this.ctx.lineTo(x, this.height);
+        }
+        for(let y=0; y<this.height; y+=gridSize) {
+            this.ctx.moveTo(0, y); this.ctx.lineTo(this.width, y);
+        }
+        this.ctx.stroke();
+
+        const item = this.galleryItems[this.currentGalleryIndex];
+        const cls = item.cls;
+        const dummy = this.replayDummies[cls.name];
+
+        if (dummy) {
+            this.ctx.save();
+            // 画面中央に配置
+            this.ctx.translate(this.width / 2, this.height / 2 - 50);
+            // 少し拡大
+            const scale = 2.0;
+            this.ctx.scale(scale, scale);
+            // ドラッグで回転
+            this.ctx.rotate(this.galleryRotationAngle);
+
+            // 座標をリセットして描画
+            dummy.x = 0;
+            dummy.y = 0;
+            // アニメーション用パラメータ更新（簡易的）
+            if (dummy.timer !== undefined) dummy.timer += 0.05;
+            if (dummy.moveTimer !== undefined) dummy.moveTimer += 0.1;
+
+            dummy.draw(this.ctx, this.frameCount);
             this.ctx.restore();
         }
     }

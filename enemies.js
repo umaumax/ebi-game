@@ -1982,7 +1982,7 @@ export class Trash extends Enemy {
 export class MorayEel extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 20;
+        this.radius = 30;
         this.timer = 0;
     }
     update(speed) {
@@ -1990,22 +1990,65 @@ export class MorayEel extends Enemy {
         this.y += Math.sin(this.timer += 0.1) * 2;
     }
     draw(ctx) {
-        ctx.fillStyle = '#8B4513'; // 茶色
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // ウツボの体（S字）
+        const t = this.timer;
+        const wave = Math.sin(t) * 5;
+        
+        // 体のグラデーション
+        const grad = ctx.createLinearGradient(-40, 0, 40, 0);
+        grad.addColorStop(0, '#D2B48C'); // Tan
+        grad.addColorStop(1, '#8B4513'); // SaddleBrown
+        ctx.fillStyle = grad;
+
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 40, 15, 0, 0, Math.PI * 2);
+        // 頭
+        ctx.moveTo(-40, -10);
+        ctx.bezierCurveTo(-20, -20 + wave, 20, -20 - wave, 50, 0);
+        // 腹
+        ctx.bezierCurveTo(20, 20 - wave, -20, 20 + wave, -40, 15);
+        ctx.closePath();
         ctx.fill();
-        // 口を開ける
-        ctx.fillStyle = 'black';
+
+        // 模様（黒い斑点）
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        for(let i=0; i<5; i++) {
+            ctx.beginPath();
+            const px = -20 + i * 15;
+            const py = Math.sin(i + t) * 5;
+            ctx.arc(px, py, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 口（大きく開ける）
+        ctx.fillStyle = '#400000';
         ctx.beginPath();
-        ctx.moveTo(this.x - 40, this.y);
-        ctx.lineTo(this.x - 20, this.y - 5);
-        ctx.lineTo(this.x - 20, this.y + 5);
+        ctx.moveTo(-40, 0);
+        ctx.lineTo(-25, -5);
+        ctx.lineTo(-25, 10);
         ctx.fill();
+        
+        // 鋭い歯
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(-38, 0);
+        ctx.lineTo(-35, 3);
+        ctx.lineTo(-32, 0);
+        ctx.fill();
+
         // 目
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(this.x - 30, this.y - 8, 3, 0, Math.PI * 2);
+        ctx.arc(-32, -8, 3, 0, Math.PI * 2);
         ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-33, -8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
     }
 }
 
@@ -2013,26 +2056,69 @@ export class MorayEel extends Enemy {
 export class Penguin extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 20;
+        this.radius = 25;
         this.vy = 2;
+        this.timer = 0;
     }
     update(speed) {
         this.x -= speed + 3; // 速い
         this.y += this.vy;
         if (this.y > 300 || this.y < 50) this.vy *= -1; // 上下移動
+        this.timer += 0.2;
     }
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(Math.PI / 2); // 泳ぐ姿勢
-        ctx.fillStyle = 'black';
+        // 進行方向に向ける（上下移動に合わせて少し傾ける）
+        const angle = Math.atan2(this.vy, -3); // vx is approx -3
+        ctx.rotate(angle);
+
+        // 体（流線型）
+        const grad = ctx.createLinearGradient(-20, -10, 20, 10);
+        grad.addColorStop(0, '#2F4F4F');
+        grad.addColorStop(1, '#000000');
+        ctx.fillStyle = grad;
+        
         ctx.beginPath();
-        ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 30, 14, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // お腹（白）
         ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.ellipse(0, 3, 20, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 5, 25, 8, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // くちばし
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.moveTo(-30, 0);
+        ctx.lineTo(-40, 3);
+        ctx.lineTo(-30, 6);
+        ctx.fill();
+
+        // 目
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(-22, -3, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-23, -3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 翼（フリッパー）
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.ellipse(5, 0, 12, 4, Math.PI / 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 足
+        ctx.fillStyle = '#FF8C00';
+        ctx.beginPath();
+        ctx.ellipse(30, 2, 6, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.restore();
     }
 }
@@ -2041,21 +2127,73 @@ export class Penguin extends Enemy {
 export class Seal extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 25;
+        this.radius = 30;
+        this.timer = 0;
     }
     update(speed) {
         this.x -= speed + 1;
+        this.timer += 0.05;
     }
     draw(ctx) {
-        ctx.fillStyle = '#D3D3D3';
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // ゆったり泳ぐ
+        ctx.rotate(Math.sin(this.timer) * 0.1);
+
+        const grad = ctx.createRadialGradient(0, -5, 5, 0, 0, 30);
+        grad.addColorStop(0, '#F5F5F5');
+        grad.addColorStop(1, '#D3D3D3');
+        ctx.fillStyle = grad;
+
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 30, 15, 0, 0, Math.PI * 2);
+        // 頭から尾へ
+        ctx.moveTo(-30, 0);
+        ctx.bezierCurveTo(-20, -20, 20, -20, 40, 0); // 背中
+        ctx.bezierCurveTo(20, 20, -20, 20, -30, 0); // 腹
         ctx.fill();
+
+        // ゴマ模様
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        for(let i=0; i<6; i++) {
+            ctx.beginPath();
+            ctx.arc(-10 + Math.random()*40, (Math.random()-0.5)*20, Math.random()*2+1, 0, Math.PI*2);
+            ctx.fill();
+        }
+
         // 顔
+        // 鼻
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.ellipse(-32, 0, 3, 2, 0, 0, Math.PI*2);
+        ctx.fill();
+        // 目
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(this.x - 25, this.y - 5, 2, 0, Math.PI * 2);
+        ctx.arc(-25, -5, 2.5, 0, Math.PI * 2);
         ctx.fill();
+        // ヒゲ
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-32, 2); ctx.lineTo(-38, 5);
+        ctx.moveTo(-32, 3); ctx.lineTo(-38, 8);
+        ctx.stroke();
+
+        // 前ヒレ
+        ctx.fillStyle = '#C0C0C0';
+        ctx.beginPath();
+        ctx.ellipse(0, 10, 10, 5, 0.5, 0, Math.PI*2);
+        ctx.fill();
+
+        // 後ろヒレ
+        ctx.beginPath();
+        ctx.moveTo(40, 0);
+        ctx.lineTo(50, -5);
+        ctx.lineTo(50, 5);
+        ctx.fill();
+
+        ctx.restore();
     }
 }
 
@@ -2063,23 +2201,72 @@ export class Seal extends Enemy {
 export class Walrus extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 35;
+        this.radius = 40;
+        this.timer = 0;
     }
     update(speed) {
         this.x -= speed + 0.5;
+        this.timer += 0.05;
     }
     draw(ctx) {
-        ctx.fillStyle = '#8B4513';
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(Math.sin(this.timer * 0.5) * 0.05);
+
+        // 巨体
+        const grad = ctx.createRadialGradient(0, -10, 10, 0, 0, 45);
+        grad.addColorStop(0, '#A0522D'); // Sienna
+        grad.addColorStop(1, '#5D4037'); // Brown
+        ctx.fillStyle = grad;
+
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y, 40, 25, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 45, 30, 0, 0, Math.PI * 2);
         ctx.fill();
-        // 牙
-        ctx.fillStyle = 'white';
+
+        // 首のしわ
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(this.x - 35, this.y + 10);
-        ctx.lineTo(this.x - 35, this.y + 25);
-        ctx.lineTo(this.x - 30, this.y + 10);
+        ctx.arc(-10, 0, 28, -0.5, 0.5);
+        ctx.stroke();
+
+        // 頭
+        ctx.beginPath();
+        ctx.arc(-35, -5, 18, 0, Math.PI * 2);
         ctx.fill();
+
+        // 牙（特徴）
+        ctx.fillStyle = '#FFFAF0'; // FloralWhite
+        ctx.beginPath();
+        ctx.moveTo(-45, 5);
+        ctx.quadraticCurveTo(-45, 25, -50, 35); // 左牙
+        ctx.lineTo(-40, 35);
+        ctx.quadraticCurveTo(-35, 25, -35, 5);
+        ctx.fill();
+
+        // ヒゲ（剛毛）
+        ctx.strokeStyle = '#D2B48C';
+        ctx.lineWidth = 1;
+        for(let i=0; i<5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(-48, 0 + i*2);
+            ctx.lineTo(-55, 2 + i*3);
+            ctx.stroke();
+        }
+
+        // 目
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-42, -10, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 前ヒレ
+        ctx.fillStyle = '#5D4037';
+        ctx.beginPath();
+        ctx.ellipse(10, 20, 15, 8, 0.5, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
     }
 }
 
@@ -2136,8 +2323,12 @@ export class Meteor extends Enemy {
 export class SpaceDebris extends Enemy {
     constructor(x, y) {
         super(x, y);
-        this.radius = 10;
+        this.radius = 15;
         this.angle = Math.random();
+        const r = Math.random();
+        if (r < 0.33) this.type = 'panel';
+        else if (r < 0.66) this.type = 'metal';
+        else this.type = 'satellite';
     }
     update(speed) {
         this.x -= speed + 2;
@@ -2147,8 +2338,59 @@ export class SpaceDebris extends Enemy {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        ctx.fillStyle = '#C0C0C0';
-        ctx.fillRect(-10, -5, 20, 10);
+        
+        if (this.type === 'panel') {
+            // 太陽光パネルの破片
+            ctx.fillStyle = '#1E90FF';
+            ctx.fillRect(-15, -10, 30, 20);
+            // グリッド
+            ctx.strokeStyle = '#ADD8E6';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -10); ctx.lineTo(0, 10);
+            ctx.moveTo(-15, 0); ctx.lineTo(15, 0);
+            ctx.stroke();
+            // 断面
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.moveTo(15, -10); ctx.lineTo(10, 0); ctx.lineTo(15, 10);
+            ctx.fill();
+
+        } else if (this.type === 'metal') {
+            // 金属スクラップ
+            ctx.fillStyle = '#708090';
+            ctx.beginPath();
+            ctx.moveTo(-10, -10);
+            ctx.lineTo(10, -5);
+            ctx.lineTo(5, 10);
+            ctx.lineTo(-15, 5);
+            ctx.closePath();
+            ctx.fill();
+            // ボルト
+            ctx.fillStyle = '#D3D3D3';
+            ctx.beginPath();
+            ctx.arc(-8, -8, 2, 0, Math.PI*2);
+            ctx.arc(3, 8, 2, 0, Math.PI*2);
+            ctx.fill();
+
+        } else {
+            // 衛星パーツ（金色の断熱材）
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.moveTo(-10, -10);
+            ctx.lineTo(10, -10);
+            ctx.lineTo(15, 5);
+            ctx.lineTo(-5, 15);
+            ctx.closePath();
+            ctx.fill();
+            // 反射
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.moveTo(-10, -10);
+            ctx.lineTo(0, -10);
+            ctx.lineTo(-5, 15);
+            ctx.fill();
+        }
         ctx.restore();
     }
 }

@@ -17,35 +17,35 @@ export class Gallery {
 
     init() {
         this.items = [
-            { cls: Shrimp, name: "えびちゃん", desc: "家に帰りたい健気なエビ。\nジャンプ力には自信がある。" },
-            { cls: FriendShrimp, name: "仲間エビ", desc: "はぐれた仲間。\n助けるとライフが増える。" },
-            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。" },
-            { cls: Sardine, name: "イワシ", desc: "集団で泳ぐ小魚。\n一匹なら怖くない。" },
-            { cls: Tuna, name: "マグロ", desc: "高速で泳ぐ海の弾丸。\n止まると死ぬらしい。" },
-            { cls: Shark, name: "サメ", desc: "海のハンター。\n執拗に追いかけてくる。" },
-            { cls: Anglerfish, name: "チョウチンアンコウ", desc: "深海の誘惑者。\n光に近づいてはいけない。" },
-            { cls: Squid, name: "イカ", desc: "気まぐれに泳ぐ軟体動物。\nたまにダッシュする。" },
-            { cls: Octopus, name: "タコ", desc: "くねくね動く。\n深海では寝ていることも。" },
-            { cls: Flatfish, name: "ヒラメ", desc: "海底に潜む罠。\n踏むと食べられる。" },
-            { cls: SeaUrchin, name: "ウニ", desc: "触ると痛い。\n海底の地雷。" },
-            { cls: Jellyfish, name: "クラゲ", desc: "電気を帯びている。\n触れると痺れる。" },
-            { cls: Porcupinefish, name: "ハリセンボン", desc: "怒ると針を飛ばす。\n普段はかわいい。" },
-            { cls: ElectricEel, name: "電気ウナギ", desc: "強力な電気を放つ。\nS字に泳ぐ。" },
-            { cls: MorayEel, name: "ウツボ", desc: "岩陰から狙っている。\n噛まれると痛い。" },
-            { cls: Crab, name: "カニ", desc: "横歩きの達人。\nハサミは強力。" },
-            { cls: SeaAnemone, name: "イソギンチャク", desc: "綺麗な花には毒がある。\n触手注意。" },
-            { cls: Starfish, name: "ヒトデ", desc: "星形の生物。\n張り付かれると厄介。" },
-            { cls: Penguin, name: "ペンギン", desc: "氷の海の住人。\n水中では飛ぶように泳ぐ。" },
-            { cls: Seal, name: "アザラシ", desc: "愛らしい見た目だが\nぶつかると重い。" },
-            { cls: Walrus, name: "セイウチ", desc: "立派な牙を持つ。\n氷の海の主。" },
-            { cls: Whale, name: "クジラ", desc: "巨大な海の王者。\n吸い込み攻撃に注意。" },
-            { cls: Architeuthis, name: "ダイオウイカ", desc: "深海の伝説。\n巨大な触手で襲いかかる。" },
-            { cls: Hook, name: "釣り針", desc: "地上からの魔の手。\n引っかかると連れ去られる。" },
-            { cls: Net, name: "底引き網", desc: "根こそぎ持っていく。\n連打で逃げろ！" },
-            { cls: Trash, name: "ゴミ", desc: "人間が捨てたゴミ。\n海を汚さないで。" },
-            { cls: Meteor, name: "隕石", desc: "宇宙からの来訪者。\n当たると痛いでは済まない。" },
-            { cls: SpaceDebris, name: "スペースデブリ", desc: "宇宙のゴミ。\n高速で飛んでくる。" },
-            { cls: Planet, name: "惑星", desc: "宇宙の彼方にある星。\n衝突注意。" }
+            { cls: Shrimp, name: "えびちゃん", desc: "家に帰りたい健気なエビ。\nジャンプ力には自信がある。", depth: "全域", danger: "★" },
+            { cls: FriendShrimp, name: "仲間エビ", desc: "はぐれた仲間。\n助けるとライフが増える。", depth: "全域", danger: "-" },
+            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。", depth: "0-1000m", danger: "★" },
+            { cls: Sardine, name: "イワシ", desc: "集団で泳ぐ小魚。\n一匹なら怖くない。", depth: "0-1000m", danger: "★" },
+            { cls: Tuna, name: "マグロ", desc: "高速で泳ぐ海の弾丸。\n止まると死ぬらしい。", depth: "0-1000m", danger: "★★" },
+            { cls: Shark, name: "サメ", desc: "海のハンター。\n執拗に追いかけてくる。", depth: "0-2000m", danger: "★★★" },
+            { cls: Anglerfish, name: "チョウチンアンコウ", desc: "深海の誘惑者。\n光に近づいてはいけない。", depth: "1000m+", danger: "★★★" },
+            { cls: Squid, name: "イカ", desc: "気まぐれに泳ぐ軟体動物。\nたまにダッシュする。", depth: "0-2000m", danger: "★★" },
+            { cls: Octopus, name: "タコ", desc: "くねくね動く。\n深海では寝ていることも。", depth: "1000m+", danger: "★★" },
+            { cls: Flatfish, name: "ヒラメ", desc: "海底に潜む罠。\n踏むと食べられる。", depth: "0-2000m", danger: "★★★" },
+            { cls: SeaUrchin, name: "ウニ", desc: "触ると痛い。\n海底の地雷。", depth: "0-2000m", danger: "★★" },
+            { cls: Jellyfish, name: "クラゲ", desc: "電気を帯びている。\n触れると痺れる。", depth: "0-3000m", danger: "★★" },
+            { cls: Porcupinefish, name: "ハリセンボン", desc: "怒ると針を飛ばす。\n普段はかわいい。", depth: "0-1000m", danger: "★★" },
+            { cls: ElectricEel, name: "電気ウナギ", desc: "強力な電気を放つ。\nS字に泳ぐ。", depth: "1000m+", danger: "★★★" },
+            { cls: MorayEel, name: "ウツボ", desc: "岩陰から狙っている。\n噛まれると痛い。", depth: "3000-4000m", danger: "★★★" },
+            { cls: Crab, name: "カニ", desc: "横歩きの達人。\nハサミは強力。", depth: "0-3000m", danger: "★★" },
+            { cls: SeaAnemone, name: "イソギンチャク", desc: "綺麗な花には毒がある。\n触手注意。", depth: "1000m+", danger: "★★" },
+            { cls: Starfish, name: "ヒトデ", desc: "星形の生物。\n張り付かれると厄介。", depth: "1000m+", danger: "★" },
+            { cls: Penguin, name: "ペンギン", desc: "氷の海の住人。\n水中では飛ぶように泳ぐ。", depth: "4000-5000m", danger: "★★" },
+            { cls: Seal, name: "アザラシ", desc: "愛らしい見た目だが\nぶつかると重い。", depth: "4000-5000m", danger: "★★" },
+            { cls: Walrus, name: "セイウチ", desc: "立派な牙を持つ。\n氷の海の主。", depth: "4000-5000m", danger: "★★★" },
+            { cls: Whale, name: "クジラ", desc: "巨大な海の王者。\n吸い込み攻撃に注意。", depth: "0-3000m", danger: "★★★★★" },
+            { cls: Architeuthis, name: "ダイオウイカ", desc: "深海の伝説。\n巨大な触手で襲いかかる。", depth: "2000m+", danger: "★★★★★" },
+            { cls: Hook, name: "釣り針", desc: "地上からの魔の手。\n引っかかると連れ去られる。", depth: "0-500m", danger: "★★" },
+            { cls: Net, name: "底引き網", desc: "根こそぎ持っていく。\n連打で逃げろ！", depth: "0-1000m", danger: "★★★★" },
+            { cls: Trash, name: "ゴミ", desc: "人間が捨てたゴミ。\n海を汚さないで。", depth: "3000-4000m", danger: "★" },
+            { cls: Meteor, name: "隕石", desc: "宇宙からの来訪者。\n当たると痛いでは済まない。", depth: "5000m+", danger: "★★★★" },
+            { cls: SpaceDebris, name: "スペースデブリ", desc: "宇宙のゴミ。\n高速で飛んでくる。", depth: "5000m+", danger: "★★★" },
+            { cls: Planet, name: "惑星", desc: "宇宙の彼方にある星。\n衝突注意。", depth: "5000m+", danger: "★★★★★" }
         ];
 
         this.renderList();
@@ -79,6 +79,8 @@ export class Gallery {
                 const descEl = document.getElementById('gallery-desc');
                 if (nameEl) nameEl.innerText = item.name;
                 if (descEl) descEl.innerText = item.desc;
+                const statsEl = document.getElementById('gallery-stats');
+                if (statsEl) statsEl.innerText = `出現深度: ${item.depth} / 危険度: ${item.danger}`;
             };
 
             // Canvasサムネイル生成
@@ -100,6 +102,8 @@ export class Gallery {
         const descEl = document.getElementById('gallery-desc');
         if (nameEl) nameEl.innerText = firstItem.name;
         if (descEl) descEl.innerText = firstItem.desc;
+        const statsEl = document.getElementById('gallery-stats');
+        if (statsEl) statsEl.innerText = `出現深度: ${firstItem.depth} / 危険度: ${firstItem.danger}`;
     }
 
     drawThumbnail(ctx, EnemyClass) {

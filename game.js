@@ -36,6 +36,8 @@ export class Game {
         this.rapidCurrentY = 0; // 激流の中心Y座標
         this.inRapidCurrentZone = false; // プレイヤーが激流に巻き込まれているか
         this.rapidCurrentTimer = 0;
+        this.isRapidCurrentWarning = false;
+        this.rapidCurrentWarningTimer = 0;
         this.isKelpZone = false; // 昆布ゾーン
         this.kelpZoneTimer = 0;
         this.isSludgeZone = false;
@@ -133,10 +135,23 @@ export class Game {
                 description: '宝箱を1個獲得',
                 icon: '💎',
                 condition: (g) => g.treasureChestsCollected >= 1
+            },
+            {
+                id: 'find_pearl',
+                title: '真珠の輝き',
+                description: '真珠を発見する',
+                icon: '⚪',
+                condition: (g) => g.pearlCollected
+            },
+            {
+                id: 'friend_clownfish',
+                title: '小さな友達',
+                description: 'カクレクマノミと出会う',
+                icon: '🐠',
+                condition: (g) => g.clownfishCollected
             }];
         this.sessionAchievements = [];
-        this.unlockedAchievements = JSON.parse(localStorage.getItem(
-            'ebi_achievements')) || [];
+        this.unlockedAchievements = []; // 毎回リセット
         this.itemsCollected = 0;
         this.treasureChestsCollected = 0;
         this.pearlCollected = false;
@@ -367,6 +382,8 @@ export class Game {
         this.scrollOffset = 0;
         this.isRapidCurrent = false;
         this.rapidCurrentTimer = 0;
+        this.isRapidCurrentWarning = false;
+        this.rapidCurrentWarningTimer = 0;
         this.isKelpZone = false;
         this.isAscendZone = false;
         this.kelpZoneTimer = 0;
@@ -379,6 +396,7 @@ export class Game {
         this.damageTaken = false;
         this.currentRank = this.getRank(0);
         this.sessionAchievements = [];
+        this.unlockedAchievements = []; // 称号リセット
         this.pushedByRock = false;
         this.pearlCollected = false;
         this.clownfishCollected = false;
@@ -539,10 +557,6 @@ export class Game {
             if (!this.unlockedAchievements.includes(ach.id)) {
                 if (ach.condition(this)) {
                     this.unlockedAchievements.push(ach.id);
-                    localStorage.setItem(
-                        'ebi_achievements', JSON.stringify(
-                            this.unlockedAchievements
-                        ));
                     this.showNotification(ach.icon,
                         `実績解除！\n${ach.title}`);
                 }
@@ -677,9 +691,9 @@ export class Game {
         if (!this.isAscendZone) this.pushedByRock = false; // フレームごとにリセット
 
         // ゾーン判定
-        this.isSludgeZone = (this.score >= 3000 && this.score < 4000);
-        this.isIceZone = (this.score >= 4000 && this.score < 5000);
-        this.isSpaceZone = (this.score >= 5000);
+        this.isSludgeZone = !this.isAscendZone && (this.score >= 3000 && this.score < 4000);
+        this.isIceZone = !this.isAscendZone && (this.score >= 4000 && this.score < 5000);
+        this.isSpaceZone = !this.isAscendZone && (this.score >= 5000);
 
         // コンボタイマー更新
         if (this.comboTimer > 0) {
@@ -728,7 +742,7 @@ export class Game {
                         this.enemies.push(new Architeuthis(this.width + 200, this.height / 2, this));
                     }
                     else {
-                        this.enemies.push(new Whale(this.width + 200, this.height / 2));
+                        this.enemies.push(new Whale(this.width + 500, this.height / 2));
                     }
                 }
             }, 3000);
@@ -752,19 +766,30 @@ export class Game {
         // 約20秒ごとに5秒間激流にする
         // 難易度が高いほど頻繁に
         const rapidCurrentInterval = this.difficulty === 'HARD' ? 1000 : 1500;
-        if (!this.isRapidCurrent && !this.isKelpZone && this.rapidCurrentTimer >
+        if (!this.isRapidCurrent && !this.isRapidCurrentWarning && !this.isKelpZone && this.rapidCurrentTimer >
             rapidCurrentInterval) {
             if (Math.random() < 0.02) { // ランダム性を持たせる
-                this.isRapidCurrent = true;
-                this.rapidCurrentTimer = 0;
+                this.isRapidCurrentWarning = true;
+                this.rapidCurrentWarningTimer = 0;
                 // 激流の高さを決定 (画面の20%〜80%の範囲)
                 this.rapidCurrentY = this.height * 0.2 + Math.random() *
                     (this.height * 0.6);
-                this.addFloatingText(this.width / 2, this.rapidCurrentY,
-                    "激流注意！", "#FF4500");
+                this.sound.playTone(600, 'square', 0.1, 0.1);
             }
         }
-        else if (this.isRapidCurrent) {
+        
+        if (this.isRapidCurrentWarning) {
+            this.rapidCurrentWarningTimer++;
+            if (this.rapidCurrentWarningTimer % 30 === 0) {
+                this.sound.playTone(600, 'square', 0.1, 0.1);
+            }
+            if (this.rapidCurrentWarningTimer > 120) { // 2秒間警告
+                this.isRapidCurrentWarning = false;
+                this.isRapidCurrent = true;
+                this.rapidCurrentTimer = 0;
+                this.addFloatingText(this.width / 2, this.rapidCurrentY, "激流注意！", "#FF4500");
+            }
+        } else if (this.isRapidCurrent) {
             if (this.rapidCurrentTimer > 300) {
                 this.isRapidCurrent = false;
                 this.inRapidCurrentZone = false;
@@ -791,7 +816,7 @@ export class Game {
 
         // 昆布ゾーン（低速）の制御
         const kelpZoneInterval = 1000;
-        if (!this.isKelpZone && !this.isRapidCurrent && this.kelpZoneTimer >
+        if (!this.isKelpZone && !this.isRapidCurrent && !this.isRapidCurrentWarning && this.kelpZoneTimer >
             kelpZoneInterval) {
             if (Math.random() < 0.02) {
                 this.isKelpZone = true;
@@ -967,7 +992,7 @@ export class Game {
                     else if (enemy instanceof Meteor || enemy instanceof SpaceDebris) reason = "宇宙の藻屑となった";
                     else if (enemy instanceof Planet) reason = "惑星に衝突した";
 
-                    if (this.inRapidCurrentZone) {
+                    if (this.isRapidCurrent && this.inRapidCurrentZone) {
                         reason = "激流で回避不能！" + reason;
                     }
                     this.hitPlayer(reason);
@@ -1211,6 +1236,35 @@ export class Game {
             this.ctx.fillRect(0, this.rapidCurrentY - 100, this.width,
                 200);
         }
+        
+        // 激流警告アイコン
+        if (this.isRapidCurrentWarning) {
+            if (Math.floor(this.frameCount / 10) % 2 === 0) {
+                const x = this.width - 60;
+                const y = this.rapidCurrentY;
+                
+                // アニメーション（拡大縮小）
+                const scale = 1.0 + Math.sin(this.frameCount * 0.2) * 0.2;
+
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                
+                // 警告マーク（三角形）
+                this.ctx.fillStyle = '#FF4500';
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -30);
+                this.ctx.scale(scale, scale);
+                this.ctx.lineTo(30, 20);
+                this.ctx.lineTo(-30, 20);
+                this.ctx.fill();
+                
+                this.ctx.fillStyle = 'white';
+                this.ctx.font = 'bold 30px sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('!', 0, 15);
+                this.ctx.restore();
+            }
+        }
 
         // 昆布ゾーンエフェクト
         if (this.isKelpZone) {
@@ -1255,7 +1309,7 @@ export class Game {
         if (this.score > 500) {
             const darknessStart = 500;
             const darknessEnd = 3000;
-            const maxDarkness = this.width < 600 ? 0.85 : 0.95; // スマホは少し明るく
+            const maxDarkness = this.width < 600 ? 0.6 : 0.95; // スマホはかなり明るく
             const ratio = Math.min(Math.max((this.score -
                 darknessStart) / (darknessEnd - darknessStart), 0), 1);
             

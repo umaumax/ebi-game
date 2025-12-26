@@ -131,14 +131,16 @@
                 font-size: 24px;
             }
             #gameover-screen h1 {
-                font-size: 24px;
+                font-size: 20px;
             }
             .warning-msg {
-                font-size: 32px;
+                font-size: 24px;
             }
             .achievement-notification {
-                font-size: 14px;
-                padding: 8px 20px;
+                font-size: 11px;
+                padding: 6px 12px;
+                width: 80%;
+                justify-content: center;
             }
             p {
                 font-size: 14px;
@@ -280,10 +282,10 @@
             transform: translateX(-50%);
             background: linear-gradient(45deg, #FFD700, #FFA500);
             color: #fff;
-            padding: 10px 30px;
-            border-radius: 30px;
+            padding: 8px 20px;
+            border-radius: 20px;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 14px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 2000;
@@ -327,24 +329,49 @@
             opacity: 0.5;
         }
 
-        .badge:hover::after,
-        .badge:active::after {
+        .badge.active::after {
             content: attr(data-title);
             position: absolute;
             bottom: 120%;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             color: #fff;
-            padding: 5px 10px;
+            padding: 8px;
             border-radius: 5px;
             font-size: 12px;
-            white-space: nowrap;
+            white-space: pre-wrap;
             z-index: 100;
             pointer-events: none;
-            white-space: pre-wrap;
-            /* 改行対応 */
+            width: 150px;
             text-align: center;
+        }
+
+        .badge:hover::after,
+        .badge:active::after {
+            /* PC hover style handled by .active for mobile consistency or keep hover for PC */
+        }
+        
+        /* PC only hover */
+        @media (min-width: 601px) {
+            .badge:hover::after {
+                content: attr(data-title);
+                position: absolute;
+                bottom: 120%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: #fff;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                white-space: pre-wrap;
+                z-index: 100;
+                pointer-events: none;
+                text-align: center;
+                width: max-content;
+                max-width: 200px;
+            }
         }
 
         .badge.new {
@@ -522,12 +549,15 @@
         <div id="start-screen" class="message-box">
             <h1>えびちゃん<span id="title-kari" style="cursor: pointer; color: #FF4500;">（仮）</span></h1>
             <p>泳ぐ：タップ / スペース</p>
+            <p style="font-size: 12px; color: #888; margin: 2px 0;">Ver 1.0.2</p>
             <p>難易度を選んでスタート</p>
             <div class="difficulty-select">
                 <button id="btn-easy" class="diff-btn" style="background-color: #4CAF50;">EASY</button>
                 <button id="btn-normal" class="diff-btn" style="background-color: #2196F3;">NORMAL</button>
                 <button id="btn-hard" class="diff-btn" style="background-color: #f44336;">HARD</button>
-                <button id="btn-gallery" class="diff-btn" style="background-color: #9C27B0;">図鑑</button>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <button id="btn-gallery" class="diff-btn" style="background-color: #9C27B0; min-width: 120px;">図鑑</button>
             </div>
         </div>
 
@@ -571,6 +601,7 @@
         <div style="position:absolute; bottom:50px; width:100%; text-align:center; pointer-events:auto; background: rgba(0,0,0,0.5); padding: 20px 0;">
             <h2 id="gallery-name" style="color:white; text-shadow:2px 2px 0 #000; font-size:32px; margin:0 0 10px 0;">Name</h2>
             <p id="gallery-desc" style="color:#eee; text-shadow:1px 1px 0 #000; font-size:16px; margin:0 0 20px 0;">Description</p>
+            <p id="gallery-stats" style="color:#FFD700; text-shadow:1px 1px 0 #000; font-size:14px; margin:0 0 20px 0; font-weight:bold;"></p>
             <button id="gallery-prev" class="diff-btn" style="background-color:#555;">&lt;</button>
             <button id="gallery-back" class="diff-btn" style="background-color:#f44336;">戻る</button>
             <button id="gallery-next" class="diff-btn" style="background-color:#555;">&gt;</button>

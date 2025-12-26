@@ -360,9 +360,10 @@ export class Seaweed {
 }
 
 export class RuggedTerrain {
-    constructor(x, y) {
+    constructor(x, y, isSandy = false) {
         this.x = x;
         this.y = y;
+        this.isSandy = isSandy;
         this.width = Math.random() * 300 + 250; // 幅を大きく
         this.baseHeight = Math.random() * 200 + 100; // 高さを大きく
         this.points = [];
@@ -386,8 +387,14 @@ export class RuggedTerrain {
     draw(ctx) {
         const grad = ctx.createLinearGradient(this.x, this.y -
             this.baseHeight, this.x, this.y);
-        grad.addColorStop(0, '#606060');
-        grad.addColorStop(1, '#404040');
+        if (this.isSandy) {
+            // 砂地の色
+            grad.addColorStop(0, '#F4A460'); // SandyBrown
+            grad.addColorStop(1, '#8B4513'); // SaddleBrown
+        } else {
+            grad.addColorStop(0, '#606060');
+            grad.addColorStop(1, '#404040');
+        }
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.moveTo(this.x + this.points[0].x, this.y);

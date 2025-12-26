@@ -29,6 +29,7 @@ export class UIManager {
         this.galleryUI = document.getElementById('gallery-ui');
         this.galleryName = document.getElementById('gallery-name');
         this.galleryDesc = document.getElementById('gallery-desc');
+        this.galleryStats = document.getElementById('gallery-stats');
         this.galleryList = document.getElementById('gallery-list');
 
         // Replay UI
@@ -186,18 +187,27 @@ export class UIManager {
         if (!parent) return;
 
         // 既存のDISTANCEテキストがあれば削除（重複防止）
-        Array.from(parent.childNodes).forEach(node => {
-            // スコア表示要素自体や、作成済みのラベルは除外
-            if (node === this.scoreDisplay || (node.classList && node.classList.contains('distance-label'))) return;
+        // index.htmlで <span id="trigger-sludge">D</span>ISTANCE: のように分かれている場合に対応
+        const triggerSludge = parent.querySelector('#trigger-sludge');
+        if (triggerSludge) triggerSludge.remove();
 
-            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('DISTANCE')) {
-                node.textContent = node.textContent.replace(/DISTANCE\s*:?/, '');
+        for (let i = 0; i < parent.childNodes.length; i++) {
+            const node = parent.childNodes[i];
+            // スコア表示要素自体や、作成済みのラベルは除外
+            if (node === this.scoreDisplay || (node.classList && node.classList.contains('distance-label'))) continue;
+
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (node.textContent.includes('DISTANCE')) {
+                    node.textContent = node.textContent.replace(/DISTANCE\s*:?/, '');
+                } else if (node.textContent.includes('ISTANCE')) {
+                    node.textContent = node.textContent.replace(/ISTANCE\s*:?/, '');
+                }
             }
             // 要素ノード（<span>DISTANCE</span>など）の場合も考慮して削除
             else if (node.nodeType === Node.ELEMENT_NODE && node.textContent.includes('DISTANCE')) {
                 node.innerHTML = node.innerHTML.replace(/DISTANCE\s*:?/, '');
             }
-        });
+        }
 
         // 既に作成済みなら何もしない
         if (parent.querySelector('.distance-label')) return;
@@ -316,7 +326,13 @@ export class UIManager {
             // スマホ向けタップでツールチップ表示
             badge.addEventListener('click', (e) => {
                 e.stopPropagation(); // リトライイベントを発火させない
-                // ここでツールチップ表示のロジックを実装（例：カスタムツールチップUIを表示）
+                
+                // 既にアクティブなら閉じる、そうでなければ開く
+                const wasActive = badge.classList.contains('active');
+                // 他のバッジを閉じる
+                this.badgeContainer.querySelectorAll('.badge').forEach(b => b.classList.remove('active'));
+                
+                if (!wasActive) badge.classList.add('active');
             });
         });
 
@@ -349,6 +365,7 @@ export class UIManager {
         const item = this.game.gallery.getCurrentItem();
         this.galleryName.innerText = item.name;
         this.galleryDesc.innerText = item.desc;
+        this.galleryStats.innerText = `出現深度: ${item.depth} / 危険度: ${item.danger}`;
 
         const icons = this.galleryList.querySelectorAll('.gallery-icon');
         icons.forEach((icon, idx) => {
@@ -389,9 +406,41 @@ export class UIManager {
 
             dummy.x = 0;
             dummy.y = 0;
-            if (dummy.timer !== undefined) dummy.timer += 0.05;
-            if (dummy.moveTimer !== undefined) dummy.moveTimer += 0.1;
 
+            // アニメーション用パラメータの更新
+            if (dummy.timer !== undefined) dummy.timer += 0.1;
+            if (dummy.moveTimer !== undefined) dummy.moveTimer += 0.1;
+            if (dummy.walkTimer !== undefined) dummy.walkTimer += 0.2;
+            if (dummy.electricTimer !== undefined) dummy.electricTimer++;
+            if (dummy.angle !== undefined) dummy.angle += 0.05;
+
+            const name = cls.name;
+
+            // 個別のアニメーションロジック
+            if (name === 'Jellyfish') {
+                if (dummy.electricTimer > 30) {
+                    dummy.isElectric = !dummy.isElectric;
+                    dummy.electricTimer = 0;
+                }
+            } else if (name === 'Porcupinefish') {
+                const t = this.game.frameCount % 120;
+                dummy.scale = (t > 60 && t < 100) ? 1.0 + Math.sin((t - 60) * 0.1) * 0.2 : 1.0;
+            } else if (name === 'Whale') {
+                dummy.isSucking = (this.game.frameCount % 240 > 180);
+                if (dummy.isSucking) dummy.suckTimer++; else dummy.suckTimer = 0;
+            }
+
+            // 泳ぐ動作（上下移動など）
+            if (['Fish', 'Sardine', 'Tuna', 'Shark', 'Seal', 'Walrus', 'Whale', 'Architeuthis', 'Penguin', 'MorayEel'].includes(name)) {
+                dummy.y = Math.sin(this.game.frameCount * 0.05) * 5;
+            }
+            if (name === 'Penguin') {
+                dummy.vy = Math.sin(this.game.frameCount * 0.1) * 2;
+            }
+            if (['Squid', 'Jellyfish', 'Octopus', 'Plankton', 'FriendShrimp', 'Clownfish'].includes(name)) {
+                dummy.y = Math.sin(this.game.frameCount * 0.05) * 3;
+            }
+            
             dummy.draw(ctx, this.game.frameCount);
             ctx.restore();
         }

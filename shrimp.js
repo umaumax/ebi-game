@@ -81,7 +81,8 @@ export class Shrimp {
 
         // 左端判定（ゲームオーバー）
         if (this.x < -this.radius) {
-            game.gameOver("波にさらわれた");
+            // 岩に押されて死んだ場合はメッセージを変える
+            game.gameOver(game.pushedByRock ? "岩に挟まれた" : "波にさらわれた");
             return;
         }
 

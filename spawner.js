@@ -168,8 +168,8 @@ export class Spawner {
                 this.game.enemies.push(new Crab(this.game.width, this.game.getGroundY(
                     this.game.width)));
             }
-            else if (this.game.score > 200 && Math.random() < 0.1) { // 通常ゾーンでも砂地を増やす
-                 this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, true)); // isSandy=true
+            else if (this.game.score > 200 && Math.random() < 0.3) { // 通常ゾーンでも砂地を増やす(確率アップ)
+                 this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, true));
             }
             else {
                 this.game.enemies.push(new SeaUrchin(this.game.width, this.game.height -
@@ -179,6 +179,16 @@ export class Spawner {
             const enemy = this.game.enemies[this.game.enemies.length - 1];
             if (enemy) {
                 enemy.radius *= this.game.scaleFactor;
+                
+                // 岩の中に生成された場合、岩の上に移動させる
+                const rock = this.game.decorations.find(d => d instanceof RuggedTerrain && 
+                    enemy.x >= d.x && enemy.x <= d.x + d.width);
+                if (rock) {
+                    const surface = rock.getSurfaceInfo(enemy.x);
+                    if (surface && enemy.y + enemy.radius > surface.y) {
+                        enemy.y = surface.y - enemy.radius - 10;
+                    }
+                }
             }
         }
     }
@@ -256,7 +266,7 @@ export class Spawner {
                     }
                 } else if (rand < (isDeep ? 0.7 : 0.9)) { // 深海での岩出現率を少し下げる
                     // isSandyフラグを追加して、砂地か岩かを制御
-                    const isSandy = isDeep && Math.random() < 0.4; // 深海では40%の確率で砂地
+                    const isSandy = isDeep && Math.random() < 0.6; // 深海では60%の確率で砂地
                     this.game.decorations.push(new RuggedTerrain(this.game.width, this.game.height, isSandy));
                 } else if (isDeep) {
                     // 深海ではサンゴの代わりに別のものを

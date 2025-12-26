@@ -197,9 +197,9 @@ class Tuna extends Enemy {
         // 第2背びれ・尻びれ（鎌状）
         ctx.fillStyle = '#191970'; // 濃紺
         ctx.beginPath();
-        ctx.moveTo(this.x + 10, this.y - 25);
-        ctx.quadraticCurveTo(this.x + 15, this.y - 45, this.x +
-            25, this.y - 22);
+        ctx.moveTo(this.x + 5, this.y - 25);
+        ctx.quadraticCurveTo(this.x + 15, this.y - 40, this.x +
+            25, this.y - 20);
         ctx.fill();
         ctx.fillStyle = '#F0F8FF'; // 白っぽい
         ctx.beginPath();
@@ -566,43 +566,16 @@ class Squid extends Enemy {
         this.vx *= 0.95;
         this.vy *= 0.95;
 
-        // 攻撃予兆
-        if (this.lungeTimer > 70 && this.lungeTimer <= 100) {
-            this.attackTelegraphTimer++;
-        }
-
-        // 定期的にダッシュ（ゲッソー風）
-        if (this.lungeTimer > 100) {
-            this.lungeTimer = 0;
-            this.vx = 4.0; // 左へ加速
-            this.vy = (Math.random() - 0.5) * 8; // 上下ランダム
-        }
-
         this.x -= this.vx;
         this.y += this.vy;
 
         // ダッシュしていない時はふわふわ
-        if (Math.abs(this.vy) < 0.5) {
-            this.y += Math.sin(this.timer) * 0.5;
-        }
+        this.y += Math.sin(this.timer) * 0.5;
     }
     draw(ctx) {
         if (this.isSleeping) {
             this.drawSleeping(ctx, this.timer);
             return;
-        }
-
-        // 攻撃予兆（触手を伸ばして狙いを定めるような描画）
-        if (this.lungeTimer > 70 && this.lungeTimer <= 100) {
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(this.x, this.y);
-            ctx.lineTo(this.x - 100, this.y + (Math.random()-0.5)*50); // 攻撃方向の目安
-            ctx.stroke();
-            ctx.restore();
         }
 
         const grad = ctx.createRadialGradient(this.x, this.y - 10,
@@ -617,6 +590,17 @@ class Squid extends Enemy {
         ctx.lineTo(this.x + 15, this.y);
         ctx.lineTo(this.x - 15, this.y);
         ctx.fill();
+        
+        // 足（触腕）- 復活
+        ctx.strokeStyle = '#FFF5EE';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        for(let i=-2; i<=2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(this.x + i*4, this.y);
+            ctx.quadraticCurveTo(this.x + i*6, this.y + 10, this.x + i*3, this.y + 20);
+            ctx.stroke();
+        }
 
         // ヒレ
         ctx.beginPath();
@@ -657,12 +641,21 @@ class Squid extends Enemy {
         // 寝ている形状（ヒレが垂れ下がっている）
         ctx.beginPath();
         ctx.moveTo(0, -25); // 頭頂部
-        ctx.lineTo(20, 10);
-        // 左下ボディ
-        ctx.lineTo(-20, 10);
-        // 左ヒレ（垂れる）
+        ctx.lineTo(15, 0);  // 右下
+        ctx.lineTo(-15, 0); // 左下
+        ctx.closePath();
+        ctx.fill();
+
+        // ヒレ（だらんと垂れる）
+        ctx.beginPath();
+        ctx.moveTo(15, -10);
+        ctx.quadraticCurveTo(25, -5, 20, 5);
+        ctx.lineTo(15, 0);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-15, -10);
+        ctx.quadraticCurveTo(-25, -5, -20, 5);
         ctx.lineTo(-15, 0);
-        ctx.bezierCurveTo(-30, -10, -15, -25, 0, -25);
         ctx.fill();
 
         // 閉じ目
@@ -863,6 +856,14 @@ class Flatfish extends Enemy {
         ctx.ellipse(this.x, this.y, 25, h, 0, 0, Math.PI * 2);
         ctx.fill();
 
+        // 斑点模様（擬態）
+        ctx.fillStyle = 'rgba(139, 69, 19, 0.3)';
+        for(let i=0; i<5; i++) {
+            ctx.beginPath();
+            ctx.arc(this.x + (Math.random()-0.5)*30, this.y + (Math.random()-0.5)*10, 2, 0, Math.PI*2);
+            ctx.fill();
+        }
+
         // 目
         // 捕食時は目がバッテンになるなどの演出も可能だが、シンプルに
         ctx.fillStyle = 'white';
@@ -874,6 +875,25 @@ class Flatfish extends Enemy {
         ctx.beginPath();
         ctx.arc(this.x - 5, this.y - 5, 1, 0, Math.PI * 2);
         ctx.arc(this.x + 5, this.y - 5, 1, 0, Math.PI * 2);
+        ctx.fill();
+
+        // ヒレ（追加）
+        ctx.fillStyle = this.color;
+        // 上ヒレ
+        ctx.beginPath();
+        ctx.moveTo(this.x - 15, this.y - 8);
+        ctx.quadraticCurveTo(this.x, this.y - 18, this.x + 15, this.y - 8);
+        ctx.fill();
+        // 下ヒレ
+        ctx.beginPath();
+        ctx.moveTo(this.x - 15, this.y + 8);
+        ctx.quadraticCurveTo(this.x, this.y + 18, this.x + 15, this.y + 8);
+        ctx.fill();
+        // 尾びれ
+        ctx.beginPath();
+        ctx.moveTo(this.x + 20, this.y);
+        ctx.lineTo(this.x + 30, this.y - 6);
+        ctx.lineTo(this.x + 30, this.y + 6);
         ctx.fill();
     }
 
@@ -933,13 +953,13 @@ class SeaUrchin extends Enemy {
 
         // トゲ
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 8; i++) {
-            const angle = (Math.PI * 2 / 8) * i;
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 16; i++) {
+            const angle = (Math.PI * 2 / 16) * i;
             ctx.beginPath();
             ctx.moveTo(this.x, this.y);
-            ctx.lineTo(this.x + Math.cos(angle) * 20, this.y +
-                Math.sin(angle) * 20);
+            ctx.lineTo(this.x + Math.cos(angle) * 25, this.y +
+                Math.sin(angle) * 25);
             ctx.stroke();
         }
     }
@@ -1172,8 +1192,8 @@ class Porcupinefish extends Enemy {
 
         // 灰色ベースのボディ
         const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, r);
-        grad.addColorStop(0, '#D3D3D3'); // LightGray
-        grad.addColorStop(1, '#696969'); // DimGray
+        grad.addColorStop(0, '#FFFFFF'); // White
+        grad.addColorStop(1, '#F0F8FF'); // AliceBlue
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -1191,16 +1211,6 @@ class Porcupinefish extends Enemy {
         ctx.arc(8, -5, 2, 0, Math.PI * 2);
         ctx.fill();
 
-        // 眉毛
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-12, -10);
-        ctx.lineTo(-4, -7);
-        ctx.moveTo(12, -10);
-        ctx.lineTo(4, -7);
-        ctx.stroke();
-
         // 口
         ctx.beginPath();
         ctx.arc(0, 5, 3, 0, Math.PI, false);
@@ -1214,8 +1224,8 @@ class Porcupinefish extends Enemy {
                 ctx.beginPath();
                 ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) *
                     r);
-                ctx.lineTo(Math.cos(angle) * (r + 6), Math.sin(
-                    angle) * (r + 6));
+                ctx.lineTo(Math.cos(angle) * (r + 10), Math.sin(
+                    angle) * (r + 10));
                 ctx.lineTo(Math.cos(angle + 0.2) * r, Math.sin(
                     angle + 0.2) * r);
                 ctx.fill();
@@ -1496,8 +1506,8 @@ class Whale extends Enemy {
         // 色の定義（パーツごとに塗り分ける）
         const bodyGrad = ctx.createLinearGradient(-100, -50, 100,
             50);
-        bodyGrad.addColorStop(0, '#607D8B'); // Blue Grey
-        bodyGrad.addColorStop(1, '#37474F'); // Darker Blue Grey
+        bodyGrad.addColorStop(0, '#1A237E'); // Deep Indigo
+        bodyGrad.addColorStop(1, '#303F9F'); // Indigo
         const bellyColor = '#B0BEC5';
 
         // 尾（反転しないように個別に描画）
@@ -1505,7 +1515,7 @@ class Whale extends Enemy {
         ctx.fill(this.tailPath);
 
         // 体
-        ctx.fillStyle = '#455A64'; // 少し色を変える
+        ctx.fillStyle = '#303F9F'; // 少し色を変える
         ctx.fill(this.bodyPath);
 
         // 頭
@@ -1520,7 +1530,7 @@ class Whale extends Enemy {
             ctx.rotate(openAngle);
             ctx.translate(70, -50);
         }
-        ctx.fillStyle = bellyColor;
+        ctx.fillStyle = '#90A4AE';
         ctx.fill(this.jawPath);
         ctx.restore();
 
@@ -1619,6 +1629,22 @@ class Architeuthis extends Enemy {
                     .PI * 2);
             ctx.fill();
         }
+
+        // 触腕（長い2本）を待機状態で描画
+        ctx.save();
+        const tentacleGrad = ctx.createLinearGradient(-100, 0, -40, 0);
+        tentacleGrad.addColorStop(0, '#C71585');
+        tentacleGrad.addColorStop(1, '#8B0000');
+        ctx.fillStyle = tentacleGrad;
+        
+        // 上の触腕（うねらせる）
+        ctx.beginPath();
+        ctx.moveTo(-40, -10);
+        ctx.bezierCurveTo(-80, -20, -120, -10, -150, -30 + Math.sin(this.timer)*10);
+        ctx.lineTo(-145, -25 + Math.sin(this.timer)*10);
+        ctx.bezierCurveTo(-115, -5, -80, -15, -40, -5);
+        ctx.fill();
+        ctx.restore();
 
         // 腕（触腕以外の8本）の付け根
         // 頭部より先に描画するか、位置を調整して自然につなげる
@@ -2073,37 +2099,40 @@ class FriendShrimp extends Plankton {
         this.radius = 12;
     }
     draw(ctx) {
-        // アイテムとしての仲間エビもエビらしい見た目に
+        // 仲間エビ（エビらしいシルエットに修正）
         ctx.save();
         ctx.translate(this.x, this.y);
+        // 左向きにする
+        ctx.scale(-1, 1);
+
         ctx.fillStyle = '#FFB6C1'; // LightPink
 
-        // 体
+        // 体（くの字）
         ctx.beginPath();
-        ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(5, -8, 12, 0); // 背中
+        ctx.quadraticCurveTo(8, 5, 0, 0);   // 腹
         ctx.fill();
 
-        // 節
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        // 尾びれ
         ctx.beginPath();
-        ctx.arc(-3, -2, 3, 0, Math.PI, false);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(3, -2, 3, 0, Math.PI, false);
+        ctx.moveTo(12, 0);
+        ctx.lineTo(16, -4);
+        ctx.lineTo(16, 4);
         ctx.fill();
 
-        // 尻尾
-        ctx.fillStyle = '#FFB6C1';
+        // 触角
+        ctx.strokeStyle = '#FFB6C1';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(-10, 0);
-        ctx.lineTo(-16, 5);
-        ctx.lineTo(-16, -5);
-        ctx.fill();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-8, -8);
+        ctx.stroke();
 
         // 目
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(8, -2, 1.5, 0, Math.PI * 2);
+        ctx.arc(2, -2, 1.5, 0, Math.PI * 2);
         ctx.fill();
 
         // 視認性向上のための発光エフェクト

@@ -43,220 +43,35 @@ class Game {
         this.decorations = []; // わかめ、岩、サンゴ
         this.particles = [];
         this.floatingTexts = []; // フローティングテキスト
-
-        // UI要素
-        this.uiScore = document.getElementById('score');
-        this.uiLevel = document.getElementById('level');
-        this.uiLife = document.getElementById('life-display');
-        this.uiHighScore = document.getElementById('high-score');
-        this.uiFinalScore = document.getElementById('final-score');
-        this.uiDeathReason = document.getElementById(
-            'death-reason');
-        this.uiRank = document.getElementById('rank-display');
-        this.uiLevelUp = document.getElementById('level-up-msg');
-        this.uiPauseBtn = document.getElementById('pause-btn');
-        this.uiWarning = document.getElementById('warning-msg');
-        this.screenStart = document.getElementById('start-screen');
-        this.screenGameOver = document.getElementById(
-            'gameover-screen');
-        this.screenPause = document.getElementById('pause-screen');
-        this.uiAchievement = document.getElementById(
-            'achievement-notification');
-        this.uiAchievementText = document.getElementById(
-            'achievement-text');
-        this.uiBadgeContainer = document.getElementById(
-            'badge-container');
-        this.uiComboDisplay = document.getElementById(
-            'combo-display');
-        this.uiInvincibleUsedMsg = document.getElementById(
-            'invincible-used-msg');
-        this.uiTitleKari = document.getElementById('title-kari');
-        
-        // 図鑑UI
-        this.uiGallery = document.getElementById('gallery-ui');
-        this.uiGalleryName = document.getElementById('gallery-name');
-        this.uiGalleryDesc = document.getElementById('gallery-desc');
-        this.btnGallery = document.getElementById('btn-gallery');
-
-        // ポーズ画面UI
-        this.uiBgmSlider = document.getElementById('bgm-slider');
-        this.uiSeSlider = document.getElementById('se-slider');
-        this.btnResume = document.getElementById('resume-btn');
-
         this.screenshotTaken = false;
-
-        // UI for replay
-        this.uiReplay = document.getElementById('replay-ui');
-        this.btnSkipReplay = document.getElementById(
-            'skip-replay-btn');
 
         // サブシステムの初期化
         this.spawner = new Spawner(this);
         this.replaySystem = new ReplaySystem(this);
         this.gallery = new Gallery(this);
+        this.uiManager = new UIManager(this);
 
-        // 難易度ボタン
-        this.btnEasy = document.getElementById('btn-easy');
+        // UI要素の参照をUIManagerから取得（互換性のため）
+        this.uiScore = this.uiManager.scoreDisplay;
+        this.uiLife = this.uiManager.lifeDisplay;
+        this.uiHighScore = this.uiManager.highScoreDisplay;
+        this.uiFinalScore = this.uiManager.finalScoreDisplay;
+        this.uiDeathReason = this.uiManager.deathReasonDisplay;
+        this.uiRank = this.uiManager.rankDisplay;
+        this.uiWarning = this.uiManager.warningMsg;
+        this.screenStart = this.uiManager.startScreen;
+        this.screenGameOver = this.uiManager.gameOverScreen;
+        this.screenPause = this.uiManager.pauseScreen;
+        this.uiPauseBtn = this.uiManager.pauseBtn;
+        this.uiAchievement = this.uiManager.achievementNotification;
+        this.uiAchievementText = this.uiManager.achievementText;
+        this.uiBadgeContainer = this.uiManager.badgeContainer;
+        this.uiComboDisplay = this.uiManager.comboDisplay;
+        this.uiInvincibleUsedMsg = this.uiManager.invincibleUsedMsg;
+        this.uiReplay = this.uiManager.replayUI;
         this.btnNormal = document.getElementById('btn-normal');
-        this.btnHard = document.getElementById('btn-hard');
-
-        const startHandler = (diff) => (e) => {
-            e.stopPropagation();
-            if (this.state !== STATE.START) return;
-            this.sound.init();
-            this.startGame(diff);
-        };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnEasy.addEventListener(
-            evt, startHandler('EASY')));
-        ['mousedown', 'touchstart'].forEach(evt => this.btnNormal
-            .addEventListener(evt, startHandler('NORMAL')));
-        ['mousedown', 'touchstart'].forEach(evt => this.btnHard.addEventListener(
-            evt, startHandler('HARD')));
-
-        // リプレイボタン
         this.btnReplay = document.getElementById('replay-btn');
-        const replayHandler = (e) => {
-            e.stopPropagation();
-            this.replaySystem.start();
-        };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnReplay
-            .addEventListener(evt, replayHandler));
-
-        // 図鑑ボタン
-        const galleryHandler = (e) => { e.stopPropagation(); this.gallery.start(); };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnGallery
-            .addEventListener(evt, galleryHandler));
-
-        // 図鑑操作ボタン
-        document.getElementById('gallery-prev').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.gallery.prev();
-        });
-        document.getElementById('gallery-next').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.gallery.next();
-        });
-        document.getElementById('gallery-back').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.gallery.end();
-        });
-        // スキップボタン
-        const skipReplayHandler = (e) => {
-            e.stopPropagation();
-            this.gameOver(this.deathReason);
-        };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnSkipReplay
-            .addEventListener(evt, skipReplayHandler));
-
-        // タイトル「（仮）」タップで深海手前スタート
-        const kariStartHandler = (e) => {
-            e.stopPropagation();
-            this.sound.playItem();
-            this.startGame('NORMAL', 1750); // 1800mでクジラが出る直前
-        };
-        ['mousedown', 'touchstart'].forEach(evt => this.uiTitleKari
-            .addEventListener(evt, kariStartHandler));
-
-        // 隠しスタート (D: ヘドロ, S: 宇宙, ICE: 流氷)
-        const triggerSludge = document.getElementById('trigger-sludge');
-        if (triggerSludge) {
-            triggerSludge.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.startGame('NORMAL', 3000);
-            });
-        }
-
-        const triggerSpace = document.getElementById('trigger-space');
-        if (triggerSpace) {
-            triggerSpace.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.startGame('NORMAL', 5000);
-            });
-        }
-
-        let iceSequence = "";
-        document.querySelectorAll('.trigger-char[data-char]').forEach(el => {
-            el.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const char = el.getAttribute('data-char');
-                iceSequence += char;
-                this.sound.playTone(600 + iceSequence.length * 100, 'sine', 0.1);
-                if (iceSequence === "ICE") {
-                    this.startGame('NORMAL', 4000);
-                    iceSequence = "";
-                } else if (!"ICE".startsWith(iceSequence)) {
-                    iceSequence = "";
-                }
-            });
-        });
-
-        // ポーズ画面のボタン
-        this.btnResume.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.togglePause();
-        });
-
-        document.getElementById('retry-btn').addEventListener(
-            'click', (e) => {
-                e.stopPropagation();
-                this.togglePause(); // ポーズ解除
-                this.startGame(this.difficulty); // リスタート
-            });
-
-        document.getElementById('title-btn').addEventListener(
-            'click', (e) => {
-                e.stopPropagation();
-                this.togglePause();
-                this.resetGame();
-            });
-
-        // 音量スライダー
-        this.uiBgmSlider.value = this.sound.bgmVolume;
-        this.uiSeSlider.value = this.sound.seVolume;
-
-        this.uiBgmSlider.addEventListener('input', (e) => {
-            this.sound.bgmVolume = parseFloat(e.target.value);
-        });
-        this.uiSeSlider.addEventListener('input', (e) => {
-            this.sound.seVolume = parseFloat(e.target.value);
-        });
-
-        // ゲームオーバー画面のスクショダウンロードボタン
-        this.btnGameoverDownloadSS = document.getElementById(
-            'gameover-download-ss-btn');
-        const gameoverDownloadSSHandler = (e) => {
-            e.stopPropagation();
-            const link = document.createElement('a');
-            link.download =
-                `ebi-game-result-${Date.now()}.png`;
-            link.href = this.gameOverResultURL || this.canvas
-                .toDataURL('image/png');
-            link.click();
-        };
-        ['mousedown', 'touchstart'].forEach(evt => this.btnGameoverDownloadSS
-            .addEventListener(evt, gameoverDownloadSSHandler)
-        );
-
-        // シェアボタン
-        this.btnShare = document.getElementById('share-btn');
-        this.btnShare.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const text =
-                `えびちゃん（仮）で${Math.floor(this.score)}m泳ぎました！\n死因: ${this.deathReason}\n難易度: ${this.difficulty}`;
-            const baseUrl =
-                'https://umaumax.github.io/ebi-game/';
-            const hashtags = 'えびちゃんゲーム';
-
-            // OGP画像を動的に生成するためのURLを作成
-            const ogpParams =
-                `score=${Math.floor(this.score)}&rank=${encodeURIComponent(this.getRank(this.score))}&reason=${encodeURIComponent(this.deathReason)}`;
-            // このURLはVercel等のサーバーレス関数を想定しています
-            const ogpImageUrl =
-                `https://your-serverless-function-url/api/ogp?${ogpParams}`;
-            const twitterUrl =
-                `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(baseUrl)}&hashtags=${encodeURIComponent(hashtags)}`;
-            window.open(twitterUrl, '_blank');
-        });
+        this.uiInvincibleToggle = document.getElementById('invincible-toggle');
 
         // 実績データの初期化
         this.achievements = [
@@ -320,7 +135,7 @@ class Game {
         // ページの準備が完了したらフェードインさせる
         requestAnimationFrame(() => {
             document.body.style.opacity = 1;
-            requestAnimationFrame(this.loop);
+            this.loop();
         });
     }
 
@@ -359,61 +174,6 @@ class Game {
             }
         });
         this.replayDummies['Shrimp'] = new Shrimp(0, 0);
-    }
-
-    initGallery() {
-        this.galleryItems = [
-            { cls: Shrimp, name: "えびちゃん", desc: "家に帰りたい健気なエビ。\nジャンプ力には自信がある。" },
-            { cls: FriendShrimp, name: "仲間エビ", desc: "はぐれた仲間。\n助けるとライフが増える。" },
-            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。\n群れるのが好き。" },
-            { cls: Sardine, name: "イワシ", desc: "集団で泳ぐ小魚。\n一匹なら怖くない。" },
-            { cls: Tuna, name: "マグロ", desc: "高速で泳ぐ海の弾丸。\n止まると死ぬらしい。" },
-            { cls: Shark, name: "サメ", desc: "海のハンター。\n執拗に追いかけてくる。" },
-            { cls: Anglerfish, name: "チョウチンアンコウ", desc: "深海の誘惑者。\n光に近づいてはいけない。" },
-            { cls: Squid, name: "イカ", desc: "気まぐれに泳ぐ軟体動物。\nたまにダッシュする。" },
-            { cls: Octopus, name: "タコ", desc: "くねくね動く。\n深海では寝ていることも。" },
-            { cls: Flatfish, name: "ヒラメ", desc: "海底に潜む罠。\n踏むと食べられる。" },
-            { cls: SeaUrchin, name: "ウニ", desc: "触ると痛い。\n海底の地雷。" },
-            { cls: Jellyfish, name: "クラゲ", desc: "電気を帯びている。\n触れると痺れる。" },
-            { cls: Porcupinefish, name: "ハリセンボン", desc: "怒ると針を飛ばす。\n普段はかわいい。" },
-            { cls: ElectricEel, name: "電気ウナギ", desc: "強力な電気を放つ。\nS字に泳ぐ。" },
-            { cls: MorayEel, name: "ウツボ", desc: "岩陰から狙っている。\n噛まれると痛い。" },
-            { cls: Crab, name: "カニ", desc: "横歩きの達人。\nハサミは強力。" },
-            { cls: SeaAnemone, name: "イソギンチャク", desc: "綺麗な花には毒がある。\n触手注意。" },
-            { cls: Starfish, name: "ヒトデ", desc: "星形の生物。\n張り付かれると厄介。" },
-            { cls: Penguin, name: "ペンギン", desc: "氷の海の住人。\n水中では飛ぶように泳ぐ。" },
-            { cls: Seal, name: "アザラシ", desc: "愛らしい見た目だが\nぶつかると重い。" },
-            { cls: Walrus, name: "セイウチ", desc: "立派な牙を持つ。\n氷の海の主。" },
-            { cls: Whale, name: "クジラ", desc: "巨大な海の王者。\n吸い込み攻撃に注意。" },
-            { cls: Architeuthis, name: "ダイオウイカ", desc: "深海の伝説。\n巨大な触手で襲いかかる。" },
-            { cls: Hook, name: "釣り針", desc: "地上からの魔の手。\n引っかかると連れ去られる。" },
-            { cls: Net, name: "底引き網", desc: "根こそぎ持っていく。\n連打で逃げろ！" },
-            { cls: Trash, name: "ゴミ", desc: "人間が捨てたゴミ。\n海を汚さないで。" },
-            { cls: Meteor, name: "隕石", desc: "宇宙からの来訪者。\n当たると痛いでは済まない。" },
-            { cls: SpaceDebris, name: "スペースデブリ", desc: "宇宙のゴミ。\n高速で飛んでくる。" },
-            { cls: Planet, name: "惑星", desc: "宇宙の彼方にある星。\n衝突注意。" }
-        ];
-    }
-
-    startGallery() {
-        this.state = STATE.GALLERY;
-        this.screenStart.style.display = 'none';
-        this.uiGallery.style.display = 'block';
-        this.galleryZoomLevel = 2.0; // ズームレベルをリセット
-        this.galleryRotationAngle = 0; // 図鑑を開くたびに角度をリセット
-        this.updateGalleryUI();
-    }
-
-    endGallery() {
-        this.state = STATE.START;
-        this.screenStart.style.display = 'block';
-        this.uiGallery.style.display = 'none';
-    }
-
-    updateGalleryUI() {
-        const item = this.galleryItems[this.currentGalleryIndex];
-        this.uiGalleryName.innerText = item.name;
-        this.uiGalleryDesc.innerText = item.desc;
     }
 
     resize() {
@@ -952,9 +712,9 @@ class Game {
         const currentLevel = Math.floor(this.score / 100);
         if (currentLevel > this.level) {
             this.level = currentLevel;
-            this.uiLevel.innerText = this.level + 1;
+            this.uiManager.updateLevel(this.level + 1);
             this.scrollSpeed += 0.5; // 速度アップ
-            this.showLevelUp();
+            this.uiManager.showLevelUp();
         }
 
         // 激流ゾーンの制御
@@ -1320,7 +1080,7 @@ class Game {
 
     draw() {
         if (this.state === STATE.GALLERY) {
-            this.gallery.draw(this.ctx);
+            this.uiManager.drawGallery(this.ctx);
             return;
         }
 

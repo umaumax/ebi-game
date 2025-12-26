@@ -3,26 +3,15 @@ class Gallery {
         this.game = game;
         this.items = [];
         this.currentIndex = 0;
-        this.zoomLevel = 2.0;
-        this.rotationAngle = 0;
-        this.dragStartX = 0;
-        this.baseAngle = 0;
-        this.pinchStartDist = 0;
-        this.isDragging = false;
-        
-        this.ui = document.getElementById('gallery-ui');
-        this.nameEl = document.getElementById('gallery-name');
-        this.descEl = document.getElementById('gallery-desc');
-        
+
         this.init();
-        this.setupInput();
     }
 
     init() {
         this.items = [
             { cls: Shrimp, name: "えびちゃん", desc: "家に帰りたい健気なエビ。\nジャンプ力には自信がある。" },
             { cls: FriendShrimp, name: "仲間エビ", desc: "はぐれた仲間。\n助けるとライフが増える。" },
-            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。\n群れるのが好き。" },
+            { cls: Fish, name: "魚", desc: "どこにでもいる普通の魚。" },
             { cls: Sardine, name: "イワシ", desc: "集団で泳ぐ小魚。\n一匹なら怖くない。" },
             { cls: Tuna, name: "マグロ", desc: "高速で泳ぐ海の弾丸。\n止まると死ぬらしい。" },
             { cls: Shark, name: "サメ", desc: "海のハンター。\n執拗に追いかけてくる。" },
@@ -50,141 +39,103 @@ class Gallery {
             { cls: SpaceDebris, name: "スペースデブリ", desc: "宇宙のゴミ。\n高速で飛んでくる。" },
             { cls: Planet, name: "惑星", desc: "宇宙の彼方にある星。\n衝突注意。" }
         ];
+
+        this.renderList();
     }
 
-    start() {
-        this.game.state = STATE.GALLERY;
-        this.game.screenStart.style.display = 'none';
-        this.ui.style.display = 'block';
-        this.zoomLevel = 2.0;
-        this.rotationAngle = 0;
-        this.updateUI();
+    renderList() {
+        const listContainer = document.getElementById('gallery-list');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = '';
+
+        this.items.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'gallery-icon';
+            if (index === this.currentIndex) div.classList.add('selected');
+            
+            // クリックイベント
+            div.onclick = () => {
+                this.currentIndex = index;
+                // 選択状態の更新
+                Array.from(listContainer.children).forEach((child, i) => {
+                    if (i === index) child.classList.add('selected');
+                    else child.classList.remove('selected');
+                });
+                // 親ゲーム側の表示更新メソッドがあれば呼ぶ（ここでは簡易的に音だけ）
+                if (this.game && this.game.sound) this.game.sound.playItem();
+                // 実際の詳細表示更新はUI側で行われる想定だが、
+                // ここでイベントを発火するか、UI更新関数を呼ぶ必要がある
+                // 簡易実装としてDOMを直接書き換える
+                const nameEl = document.getElementById('gallery-name');
+                const descEl = document.getElementById('gallery-desc');
+                if (nameEl) nameEl.innerText = item.name;
+                if (descEl) descEl.innerText = item.desc;
+            };
+
+            // Canvasサムネイル生成
+            const canvas = document.createElement('canvas');
+            canvas.width = 50;
+            canvas.height = 50;
+            const ctx = canvas.getContext('2d');
+
+            // 敵の描画（サムネイル用）
+            this.drawThumbnail(ctx, item.cls);
+
+            div.appendChild(canvas);
+            listContainer.appendChild(div);
+        });
+
+        // 初期表示更新
+        const firstItem = this.items[this.currentIndex];
+        const nameEl = document.getElementById('gallery-name');
+        const descEl = document.getElementById('gallery-desc');
+        if (nameEl) nameEl.innerText = firstItem.name;
+        if (descEl) descEl.innerText = firstItem.desc;
     }
 
-    end() {
-        this.game.state = STATE.START;
-        this.game.screenStart.style.display = 'block';
-        this.ui.style.display = 'none';
+    drawThumbnail(ctx, EnemyClass) {
+        // ダミーの環境を用意
+        const dummyPlayer = { x: 0, y: 0, radius: 10 };
+        const dummyGame = { score: 0, getGroundY: () => 100, decorations: [] };
+        
+        let enemy;
+        try {
+            // 中心(25, 25)に配置
+            enemy = new EnemyClass(25, 25, dummyPlayer, dummyGame);
+        } catch (e) {
+            enemy = new EnemyClass(25, 25);
+        }
+
+        ctx.save();
+        // サイズ調整: 半径が20を超える場合は縮小する
+        if (enemy.radius && enemy.radius > 20) {
+            const scale = 20 / enemy.radius;
+            ctx.translate(25, 25);
+            ctx.scale(scale, scale);
+            ctx.translate(-25, -25);
+        }
+        
+        // 一部の敵（Hookなど）は描画位置調整が必要
+        if (EnemyClass.name === 'Hook') {
+            ctx.translate(0, 50); // 針が見えるように下げる
+        }
+
+        enemy.draw(ctx);
+        ctx.restore();
     }
 
     next() {
         this.currentIndex = (this.currentIndex + 1) % this.items.length;
-        this.updateUI();
         this.game.sound.playItem();
     }
 
     prev() {
         this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
-        this.updateUI();
         this.game.sound.playItem();
     }
 
-    updateUI() {
-        const item = this.items[this.currentIndex];
-        this.nameEl.innerText = item.name;
-        this.descEl.innerText = item.desc;
-    }
-
-    setupInput() {
-        const canvas = this.game.canvas;
-
-        const dragStart = (e) => {
-            if (this.game.state !== STATE.GALLERY) return;
-            this.isDragging = true;
-            this.dragStartX = e.clientX || e.touches[0].clientX;
-            this.baseAngle = this.rotationAngle;
-        };
-        const dragEnd = () => {
-            this.isDragging = false;
-            this.pinchStartDist = 0;
-        };
-
-        canvas.addEventListener('wheel', (e) => {
-            if (this.game.state !== STATE.GALLERY) return;
-            e.preventDefault();
-            this.zoomLevel *= 1 - e.deltaY * 0.001;
-            this.zoomLevel = Math.max(0.5, Math.min(this.zoomLevel, 10.0));
-        }, { passive: false });
-
-        canvas.addEventListener('mousedown', dragStart);
-        canvas.addEventListener('mousemove', (e) => {
-            if (!this.isDragging) return;
-            const currentX = e.clientX;
-            const dx = currentX - this.dragStartX;
-            this.rotationAngle = this.baseAngle + dx * 0.01;
-        });
-        canvas.addEventListener('mouseup', dragEnd);
-        canvas.addEventListener('mouseleave', dragEnd);
-
-        canvas.addEventListener('touchstart', (e) => {
-            if (this.game.state === STATE.GALLERY) {
-                e.preventDefault();
-                if (e.touches.length === 2) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    this.pinchStartDist = Math.sqrt(dx * dx + dy * dy);
-                    this.isDragging = false;
-                } else if (e.touches.length === 1) {
-                    dragStart(e);
-                }
-            }
-        }, { passive: false });
-
-        canvas.addEventListener('touchmove', (e) => {
-            if (this.game.state === STATE.GALLERY) {
-                e.preventDefault();
-                if (e.touches.length === 2 && this.pinchStartDist > 0) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    this.zoomLevel *= dist / this.pinchStartDist;
-                    this.zoomLevel = Math.max(0.5, Math.min(this.zoomLevel, 10.0));
-                    this.pinchStartDist = dist;
-                } else if (e.touches.length === 1 && this.isDragging) {
-                    const currentX = e.touches[0].clientX;
-                    const dx = currentX - this.dragStartX;
-                    this.rotationAngle = this.baseAngle + dx * 0.01;
-                }
-            }
-        }, { passive: false });
-        canvas.addEventListener('touchend', dragEnd);
-    }
-
-    draw(ctx) {
-        // 背景
-        ctx.fillStyle = '#203040';
-        ctx.fillRect(0, 0, this.game.width, this.game.height);
-
-        // グリッド線
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 1;
-        const gridSize = 50;
-        ctx.beginPath();
-        for(let x=0; x<this.game.width; x+=gridSize) {
-            ctx.moveTo(x, 0); ctx.lineTo(x, this.game.height);
-        }
-        for(let y=0; y<this.game.height; y+=gridSize) {
-            ctx.moveTo(0, y); ctx.lineTo(this.game.width, y);
-        }
-        ctx.stroke();
-
-        const item = this.items[this.currentIndex];
-        const cls = item.cls;
-        const dummy = this.game.replaySystem.dummies[cls.name];
-
-        if (dummy) {
-            ctx.save();
-            ctx.translate(this.game.width / 2, this.game.height / 2 - 50);
-            ctx.scale(this.zoomLevel, this.zoomLevel);
-            ctx.rotate(this.rotationAngle);
-
-            dummy.x = 0;
-            dummy.y = 0;
-            if (dummy.timer !== undefined) dummy.timer += 0.05;
-            if (dummy.moveTimer !== undefined) dummy.moveTimer += 0.1;
-
-            dummy.draw(ctx, this.game.frameCount);
-            ctx.restore();
-        }
+    getCurrentItem() {
+        return this.items[this.currentIndex];
     }
 }

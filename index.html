@@ -439,6 +439,38 @@
         .trigger-char:active {
             transform: scale(0.9);
         }
+
+        /* Gallery List */
+        #gallery-list {
+            position: absolute;
+            bottom: 150px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            overflow-x: auto;
+            padding: 10px;
+            gap: 10px;
+            pointer-events: auto;
+            background: rgba(0,0,0,0.3);
+        }
+        .gallery-icon {
+            min-width: 50px;
+            height: 50px;
+            background: #fff;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            color: #333;
+            border: 2px solid transparent;
+        }
+        .gallery-icon.selected {
+            border-color: #FF4500;
+            background: #FFF5EE;
+            transform: scale(1.1);
+        }
     </style>
 </head>
 
@@ -518,6 +550,7 @@
     <!-- Gallery UI -->
     <div id="gallery-ui" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 2000;">
         <div style="position:absolute; bottom:50px; width:100%; text-align:center; pointer-events:auto; background: rgba(0,0,0,0.5); padding: 20px 0;">
+            <div id="gallery-list"></div>
             <h2 id="gallery-name" style="color:white; text-shadow:2px 2px 0 #000; font-size:32px; margin:0 0 10px 0;">Name</h2>
             <p id="gallery-desc" style="color:#eee; text-shadow:1px 1px 0 #000; font-size:16px; margin:0 0 20px 0;">Description</p>
             <button id="gallery-prev" class="diff-btn" style="background-color:#555;">&lt;</button>
@@ -566,6 +599,7 @@
     </svg>
 
     <script src="./app.js"></script>
+    <script src="./ui.js"></script>
     <script src="./spawner.js"></script>
     <script src="./gallery.js"></script>
     <script src="./replay.js"></script>

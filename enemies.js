@@ -200,6 +200,7 @@ class Tuna extends Enemy {
         ctx.moveTo(this.x + 5, this.y - 25);
         ctx.quadraticCurveTo(this.x + 15, this.y - 40, this.x +
             25, this.y - 20);
+        ctx.lineTo(this.x + 20, this.y - 20);
         ctx.fill();
         ctx.fillStyle = '#F0F8FF'; // 白っぽい
         ctx.beginPath();
@@ -877,17 +878,17 @@ class Flatfish extends Enemy {
         ctx.arc(this.x + 5, this.y - 5, 1, 0, Math.PI * 2);
         ctx.fill();
 
-        // ヒレ（追加）
+        // ヒレ（エンガワのように体の周囲を囲む）
         ctx.fillStyle = this.color;
         // 上ヒレ
         ctx.beginPath();
-        ctx.moveTo(this.x - 15, this.y - 8);
-        ctx.quadraticCurveTo(this.x, this.y - 18, this.x + 15, this.y - 8);
+        ctx.moveTo(this.x - 22, this.y);
+        ctx.quadraticCurveTo(this.x, this.y - 18, this.x + 22, this.y);
         ctx.fill();
         // 下ヒレ
         ctx.beginPath();
-        ctx.moveTo(this.x - 15, this.y + 8);
-        ctx.quadraticCurveTo(this.x, this.y + 18, this.x + 15, this.y + 8);
+        ctx.moveTo(this.x - 22, this.y);
+        ctx.quadraticCurveTo(this.x, this.y + 18, this.x + 22, this.y);
         ctx.fill();
         // 尾びれ
         ctx.beginPath();
@@ -2099,7 +2100,7 @@ class FriendShrimp extends Plankton {
         this.radius = 12;
     }
     draw(ctx) {
-        // 仲間エビ（エビらしいシルエットに修正）
+        // 仲間エビ（よりエビらしく修正）
         ctx.save();
         ctx.translate(this.x, this.y);
         // 左向きにする
@@ -2107,32 +2108,36 @@ class FriendShrimp extends Plankton {
 
         ctx.fillStyle = '#FFB6C1'; // LightPink
 
-        // 体（くの字）
+        // 頭胸部
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(5, -8, 12, 0); // 背中
-        ctx.quadraticCurveTo(8, 5, 0, 0);   // 腹
+        ctx.ellipse(4, 0, 6, 5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 尾びれ
+        // 腹部（節）
         ctx.beginPath();
-        ctx.moveTo(12, 0);
-        ctx.lineTo(16, -4);
-        ctx.lineTo(16, 4);
+        ctx.ellipse(10, -2, 5, 4, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(14, 0, 4, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 尾扇
+        ctx.beginPath();
+        ctx.moveTo(16, 0);
+        ctx.lineTo(20, -3);
+        ctx.lineTo(20, 3);
         ctx.fill();
 
         // 触角
         ctx.strokeStyle = '#FFB6C1';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(-8, -8);
+        ctx.moveTo(0, -2);
+        ctx.quadraticCurveTo(-5, -10, -10, -5);
         ctx.stroke();
 
         // 目
         ctx.fillStyle = 'black';
         ctx.beginPath();
-        ctx.arc(2, -2, 1.5, 0, Math.PI * 2);
+        ctx.arc(2, -2, 1.2, 0, Math.PI * 2);
         ctx.fill();
 
         // 視認性向上のための発光エフェクト

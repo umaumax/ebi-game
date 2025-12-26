@@ -279,7 +279,15 @@ class UIManager {
         this.game.gallery.items.forEach((item, index) => {
             const icon = document.createElement('div');
             icon.className = 'gallery-icon';
-            icon.innerText = item.name.charAt(0);
+
+            // Canvasサムネイル生成
+            const canvas = document.createElement('canvas');
+            canvas.width = 50;
+            canvas.height = 50;
+            const ctx = canvas.getContext('2d');
+            this.game.gallery.drawThumbnail(ctx, item.cls);
+            icon.appendChild(canvas);
+
             icon.title = item.name;
             icon.onclick = (e) => {
                 e.stopPropagation();

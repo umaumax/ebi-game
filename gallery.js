@@ -1,4 +1,12 @@
-class Gallery {
+import { Shrimp } from './shrimp.js';
+import {
+    Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, SeaUrchin, Octopus, Porcupinefish, Needle,
+    Whirlpool, Whale, Architeuthis, GiantTentacle, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
+    Trash, MorayEel, Penguin, Seal, Walrus, IceFloe, Meteor, SpaceDebris, Planet, Satellite
+} from './enemies.js';
+import { FriendShrimp, Pearl, TreasureChest, Plankton, Clownfish, GardenEel, Seaweed, RuggedTerrain, Coral, Shipwreck, StreamLine, Bubble } from './objects.js';
+
+export class Gallery {
     constructor(game) {
         this.game = game;
         this.items = [];

@@ -1,4 +1,12 @@
-class Spawner {
+import { CONSTANTS } from './constants.js';
+import {
+    Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, SeaUrchin, Octopus, Porcupinefish, Needle,
+    Whirlpool, Whale, Architeuthis, GiantTentacle, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
+    Trash, MorayEel, Penguin, Seal, Walrus, IceFloe, Meteor, SpaceDebris, Planet, Satellite
+} from './enemies.js';
+import { Pearl, TreasureChest, Plankton, FriendShrimp, Clownfish, GardenEel, Seaweed, RuggedTerrain, Coral, Shipwreck } from './objects.js';
+
+export class Spawner {
     constructor(game) {
         this.game = game;
     }

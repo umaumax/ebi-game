@@ -1,4 +1,18 @@
-class Game {
+import { CONSTANTS, STATE } from './constants.js';
+import { SoundManager } from './sound-manager.js';
+import { Shrimp } from './shrimp.js';
+import { Spawner } from './spawner.js';
+import { ReplaySystem } from './replay.js';
+import { Gallery } from './gallery.js';
+import { UIManager } from './ui.js';
+import { FloatingText, Bubble, StreamLine, Pearl, TreasureChest, Plankton, FriendShrimp, Clownfish, GardenEel, Seaweed, RuggedTerrain, Coral, Shipwreck } from './objects.js';
+import {
+    Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish, SeaUrchin, Octopus, Porcupinefish, Needle,
+    Whirlpool, Whale, Architeuthis, GiantTentacle, WaterSpout, WaterDrop, Jellyfish, Crab, SeaAnemone, Starfish, ElectricEel,
+    Trash, MorayEel, Penguin, Seal, Walrus, IceFloe, Meteor, SpaceDebris, Planet, Satellite
+} from './enemies.js';
+
+export class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');

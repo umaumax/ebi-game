@@ -1,4 +1,6 @@
-class UIManager {
+import { STATE } from './constants.js';
+
+export class UIManager {
     constructor(game) {
         this.game = game;
 

@@ -1,7 +1,10 @@
+import { CONSTANTS } from './constants.js';
+import { RuggedTerrain } from './objects.js';
+
 /**
  * キャラクタークラス: えびちゃん
  */
-class Shrimp {
+export class Shrimp {
     constructor(x, y) {
         this.reset(x, y);
         this.radius = CONSTANTS.SHRIMP_BASE_SIZE;

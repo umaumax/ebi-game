@@ -256,7 +256,15 @@ class Spawner {
             this.game.items.push(new Plankton(this.game.width, Math.random() *
                 (this.game.height - 100) + 50));
         }
-        if (this.game.frameCount % 600 === 0) {
+        
+        // 仲間エビの出現頻度調整
+        // 基本は600フレームごとだが、ライフが少ない時や序盤は頻度を上げる
+        let friendInterval = 600;
+        if (this.game.lives < 3 || this.game.score < 1000) {
+            friendInterval = 200; // 頻度アップ（約3.3秒に1回）
+        }
+        
+        if (this.game.frameCount % friendInterval === 0) {
             this.game.items.push(new FriendShrimp(this.game.width, Math.random() *
                 (this.game.height - 100) + 50));
         }

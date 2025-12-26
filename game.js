@@ -13,7 +13,7 @@ class Game {
         this.highScore = parseInt(localStorage.getItem(
             'ebi_highscore')) || 0;
         this.frameCount = 0;
-        this.lives = 3;
+        this.lives = 1;
         this.level = 0;
         this.scrollSpeed = CONSTANTS.SCROLL_SPEED;
         this.difficulty = 'NORMAL';
@@ -332,7 +332,7 @@ class Game {
         this.screenStart.style.display = 'none';
         this.screenGameOver.style.display = 'none';
         this.score = 0;
-        this.lives = 3;
+        this.lives = 1;
         this.updateLifeDisplay();
         this.level = Math.floor(startScore / 100);
 

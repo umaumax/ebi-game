@@ -248,7 +248,7 @@ class UIManager {
         this.galleryUI.style.display = 'block';
         this.galleryRotationAngle = 0;
         this.galleryZoomLevel = 2.0;
-        this.renderGalleryList();
+        this.game.gallery.renderList();
         this.updateGalleryUI();
     }
 
@@ -271,31 +271,6 @@ class UIManager {
             } else {
                 icon.classList.remove('selected');
             }
-        });
-    }
-
-    renderGalleryList() {
-        this.galleryList.innerHTML = '';
-        this.game.gallery.items.forEach((item, index) => {
-            const icon = document.createElement('div');
-            icon.className = 'gallery-icon';
-
-            // Canvasサムネイル生成
-            const canvas = document.createElement('canvas');
-            canvas.width = 50;
-            canvas.height = 50;
-            const ctx = canvas.getContext('2d');
-            this.game.gallery.drawThumbnail(ctx, item.cls);
-            icon.appendChild(canvas);
-
-            icon.title = item.name;
-            icon.onclick = (e) => {
-                e.stopPropagation();
-                this.game.gallery.currentIndex = index;
-                this.updateGalleryUI();
-                this.game.sound.playItem();
-            };
-            this.galleryList.appendChild(icon);
         });
     }
 

@@ -18,16 +18,15 @@ export class ReplaySystem {
 
     initDummies() {
         const classes = [
-            Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net,
-            Squid, Flatfish,
-        SeaUrchin, Octopus, Porcupinefish, Needle, Trash, MorayEel,
+            Fish, Sardine, Tuna, Shark, Anglerfish, Hook, Net, Squid, Flatfish,
+            SeaUrchin, Octopus, Porcupinefish, Needle, Trash, MorayEel,
             Whirlpool, Whale, Architeuthis, GiantTentacle,
             WaterSpout, WaterDrop, Jellyfish, Crab,
             SeaAnemone, Starfish, ElectricEel,
-        Penguin, Seal, Walrus, IceFloe,
-        Meteor, SpaceDebris, Planet, Satellite,
-        // Items and Objects
-        Pearl, Plankton, FriendShrimp, Clownfish,
+            Penguin, Seal, Walrus, IceFloe,
+            Meteor, SpaceDebris, Planet, Satellite,
+            // Items and Objects
+            Pearl, Plankton, FriendShrimp, Clownfish,
             GardenEel, TreasureChest,
             Shipwreck,
             Seaweed, RuggedTerrain, Coral, StreamLine, Bubble

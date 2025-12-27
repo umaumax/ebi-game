@@ -126,7 +126,8 @@ export class Shrimp {
                             // 下り坂（右壁）
                             this.x += Math.max(push, 5);
                         }
-                        ghis.vx *= -0.5; // 跳ね返る
+                        game.pushedByRockTimer = 60; // 1秒間フラグを立てる
+                        this.vx *= -0.5; // 跳ね返る
                     }
                 }
             }
